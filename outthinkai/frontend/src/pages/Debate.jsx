@@ -1,6 +1,18 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams, Link, useLocation } from "react-router-dom";
+import { getScenario } from "../api/client";
 
+// ---- 하위 컴포넌트: 라이브 클록 ---- //
+function LiveClock() {
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString('ko-KR'));
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date().toLocaleTimeString('ko-KR')), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="font-mono text-[14px] text-[#00ffaa] tracking-wider uppercase leading-5">{time}</span>;
+}
+
+// ---- 하위 컴포넌트: 사이드바 ---- //
 const navItems = [
   {
     label: "미션 센터", href: "/", section: "메인",
@@ -31,7 +43,7 @@ const navItems = [
   },
 ];
 
-export default function Sidebar({ isOpen, onClose }) {
+function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
 
   return (
@@ -59,7 +71,7 @@ export default function Sidebar({ isOpen, onClose }) {
           <div className="px-4 mb-[15px]"><span className="font-mono text-[9px] text-white/30 tracking-[0.9px] uppercase">메인</span></div>
           <div className="flex flex-col">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.href;
+              const isActive = location.pathname === item.href || (item.href === "/debate" && location.pathname.startsWith("/debate"));
               return (
                 <Link key={item.href} to={item.href} onClick={onClose} className={`flex items-center gap-3 px-4 py-3 relative ${isActive ? "bg-[#00ffaa]/5" : "hover:bg-white/5"} transition-colors`}>
                   <span className={isActive ? "text-white" : "text-white/60"}>{item.icon}</span>
@@ -82,5 +94,73 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
       </aside>
     </>
+  );
+}
+
+export default function Debate() {
+  const { sessionId } = useParams();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [scenario, setScenario] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchScenario() {
+      try {
+        const data = await getScenario(sessionId);
+        setScenario(data);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (sessionId) fetchScenario();
+  }, [sessionId]);
+
+  return (
+    <div className="relative flex min-h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#00ffaa]/30 font-sans">
+      {/* 배경 그리드 패턴 */}
+      <div className="fixed inset-0 opacity-[0.03] pointer-events-none" 
+           style={{ backgroundImage: "linear-gradient(rgba(0,255,170,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,170,0.3) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <main className="relative flex-1 flex flex-col min-w-0 overflow-auto z-10">
+        <div className="flex flex-col gap-10 p-6 md:p-12 max-w-[1200px] mx-auto w-full">
+          <div className="flex justify-between items-end border-b border-white/10 pb-6">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#ff00aa] animate-pulse" />
+                <span className="font-mono text-[10px] text-[#ff00aa] tracking-[2px] uppercase">Active Simulation</span>
+              </div>
+              <h1 className="font-grotesk text-[36px] md:text-[48px] font-bold leading-none tracking-tight">Debate Room</h1>
+              <p className="font-mono text-[14px] text-white/40">{">"} {sessionId ? `SESSION_ID: ${sessionId}` : "Initializing..."}</p>
+            </div>
+            <div className="hidden md:flex flex-col items-end">
+              <span className="font-mono text-[10px] text-white/40 uppercase mb-1">Local Time</span>
+              <LiveClock />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="font-mono text-[#00ffaa] animate-pulse">LOADING_DATA...</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-6">
+              <div className="p-6 bg-white/[0.02] border border-white/10">
+                <h3 className="font-mono text-[12px] text-[#00ffaa] mb-4 uppercase tracking-widest">Target Scenario</h3>
+                <p className="font-sans text-[16px] leading-relaxed text-white/80 italic">
+                  "{scenario?.scenario}"
+                </p>
+              </div>
+              <div className="p-8 border border-dashed border-white/10 flex items-center justify-center">
+                <span className="font-mono text-white/20 uppercase tracking-[4px]">Chat Interface Initializing...</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
