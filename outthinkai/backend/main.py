@@ -52,12 +52,10 @@ app.add_middleware(
 )
 
 # -----------------------------------------------------------------------------
-# 라우터 등록 (추후 기능 라우터 추가 시 이 블록에 include_router 추가)
+# 라우터 등록
 # -----------------------------------------------------------------------------
-# from routers import sessions, messages, reports
-# app.include_router(sessions.router, prefix="/api")
-# app.include_router(messages.router, prefix="/api")
-# app.include_router(reports.router, prefix="/api")
+from routers import scenario
+app.include_router(scenario.router)
 
 
 # -----------------------------------------------------------------------------
