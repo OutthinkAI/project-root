@@ -12,34 +12,30 @@ class Validator:
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def evaluate_response(
-        self, 
-        session_context: dict, 
-        agent_persona: dict, 
-        opponent_message: str, 
-        agent_message: str
+        self,
+        fallacy_type: str,
+        user_message: str,
+        last_3_turns: str,
     ) -> ValidatorResult:
         """
-        LLM을 호출하여 에이전트의 응답을 평가하고 점수를 반환합니다.
+        사용자의 반박을 평가하고 score_delta(0~40)를 반환합니다.
         """
         try:
             response = await self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
-                        "role": "system", 
+                        "role": "system",
                         "content": VALIDATOR_SYSTEM_PROMPT.format(
-                            topic=session_context["topic"],
-                            scenario=session_context["scenario"],
-                            persona=agent_persona["persona"],
-                            fallacy_type=agent_persona["fallacy_type"]
-                        )
+                            fallacy_type=fallacy_type,
+                            last_3_turns=last_3_turns,
+                        ),
                     },
                     {
-                        "role": "user", 
+                        "role": "user",
                         "content": VALIDATOR_USER_PROMPT.format(
-                            opponent_message=opponent_message,
-                            agent_message=agent_message
-                        )
+                            user_message=user_message,
+                        ),
                     },
                 ],
                 temperature=0.3,
