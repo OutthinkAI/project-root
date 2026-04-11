@@ -5,7 +5,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 
 # =============================================================================
@@ -63,13 +63,6 @@ class AgentPersona(BaseModel):
 class ScenarioGenerateRequest(BaseModel):
     topic:      str
     difficulty: Difficulty = Difficulty.intermediate
-
-    @field_validator("topic")
-    @classmethod
-    def topic_min_length(cls, v: str) -> str:
-        if not v or len(v.strip()) < 2:
-            raise ValueError("topic must be at least 2 characters")
-        return v.strip()
 
 
 class ScenarioGenerateResponse(BaseModel):
