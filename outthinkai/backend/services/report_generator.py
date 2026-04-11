@@ -7,8 +7,8 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from prompts.report_prompt import REPORT_SYSTEM_PROMPT, REPORT_USER_PROMPT
-from schemas.pydantic_schemas import FallacyCaught, ReportResponse
+from ..prompts.report_prompt import REPORT_SYSTEM_PROMPT, REPORT_USER_PROMPT
+from ..schemas.pydantic_schemas import FallacyCaught, ReportResponse
 
 logger = logging.getLogger(__name__)
 

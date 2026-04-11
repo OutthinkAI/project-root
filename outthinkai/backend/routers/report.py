@@ -6,15 +6,14 @@ from openai import APIError as OpenAIAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from db import get_db
-from schemas.pydantic_schemas import (
-    AgentPersona,
+from ..db import get_db
+from ..schemas.pydantic_schemas import (
     ErrorResponse,
     FallacyCaught,
     ReportGenerateRequest,
     ReportResponse,
 )
-from services.report_generator import generate_report
+from ..services.report_generator import generate_report
 
 logger = logging.getLogger(__name__)
 
