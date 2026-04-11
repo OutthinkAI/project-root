@@ -1,4 +1,17 @@
-FROM node:20-slim
+FROM node:20-alpine as builder
+
 WORKDIR /app
-# 일단 빈 폴더만 유지하도록 설정 (백엔드 테스트용)
-CMD ["tail", "-f", "/dev/null"]
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+FROM nginx:stable-alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
