@@ -8,16 +8,16 @@ from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
-from db import get_db
-from schemas.pydantic_schemas import (
+from ..db import get_db
+from ..schemas.pydantic_schemas import (
     ErrorResponse,
     ScenarioGenerateRequest,
     ScenarioGenerateResponse,
     AgentPersona,
 )
-from services.scenario_generator import generate_scenario
+from ..services.scenario_generator import generate_scenario
 
-router = APIRouter(prefix="/api/scenario", tags=["Scenario"])
+router = APIRouter()
 
 
 @router.post("/generate", response_model=ScenarioGenerateResponse)

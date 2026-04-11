@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from db import get_db
-from schemas.pydantic_schemas import (
+from ..db import get_db
+from ..schemas.pydantic_schemas import (
     AgentPersona,
     ErrorResponse,
     Role,
@@ -19,7 +19,7 @@ from schemas.pydantic_schemas import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/session", tags=["Session"])
+router = APIRouter()
 
 
 @router.get("/{session_id}", response_model=SessionStateResponse)
