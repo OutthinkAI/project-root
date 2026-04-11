@@ -22,6 +22,15 @@ async def post_scenario_generate(
     request: ScenarioGenerateRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    if not request.topic or len(request.topic.strip()) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail=ErrorResponse(
+                error={"code": "INVALID_TOPIC", "message": "topic은 2자 이상이어야 합니다."}
+            ).model_dump(),
+        )
+    request.topic = request.topic.strip()
+
     try:
         return await generate_scenario(request, db)
     except OpenAIAPIError as e:
