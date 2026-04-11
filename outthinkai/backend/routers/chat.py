@@ -238,11 +238,11 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
                 )
                 await db.commit()
 
+                # Validator: 사용자 반박을 대상 에이전트의 fallacy 기준으로 평가
                 val_result = await validator_service.evaluate_response(
-                    session_context={"topic": session["topic"], "scenario": session["scenario"]},
-                    agent_persona=agent_data,
-                    opponent_message=user_message,
-                    agent_message=full_content
+                    fallacy_type=agent_data["fallacy_type"],
+                    user_message=user_message,
+                    last_3_turns=history_str,
                 )
 
                 await db.execute(
@@ -272,4 +272,37 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
             await push_event(session_id, "error", {"message": str(e)})
 
 async def handle_surrender(session_id: UUID, role: str):
-    await push_event(session_id, "surrender_detected", {"agent": role})
+    async with async_session() as db:
+        # 항복한 에이전트 surrendered = true 업데이트
+        res = await db.execute(
+            text("SELECT agent_a, agent_b FROM sessions WHERE id = :sid"),
+            {"sid": str(session_id)},
+        )
+        row = res.mappings().one()
+        agent_data = dict(row[role])
+        agent_data["surrendered"] = True
+
+        other_key = "agent_b" if role == "agent_a" else "agent_a"
+        other_data = dict(row[other_key])
+        both_surrendered = other_data.get("surrendered", False)
+
+        new_status = "completed" if both_surrendered else "active"
+        await db.execute(
+            text(f"""
+                UPDATE sessions
+                SET {role} = cast(:agent_data as jsonb),
+                    status = cast(:status as session_status)
+                WHERE id = :sid
+            """),
+            {
+                "agent_data": json.dumps(agent_data, ensure_ascii=False),
+                "status": new_status,
+                "sid": str(session_id),
+            },
+        )
+        await db.commit()
+
+    await push_event(session_id, "surrender_detected", {"agent": role, "both_surrendered": both_surrendered})
+
+    if both_surrendered:
+        await push_event(session_id, "session_complete", {"session_id": str(session_id)})
