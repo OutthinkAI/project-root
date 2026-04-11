@@ -216,7 +216,11 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
                         full_content += token
                         await push_event(session_id, "agent_token", {"agent": agent_key, "token": token})
 
-                await push_event(session_id, "agent_complete", {"agent": agent_key})
+                await push_event(session_id, "agent_complete", {
+                    "agent": agent_key,
+                    "full_content": full_content,
+                    "turn_number": current_turn,
+                })
 
                 msg_id = uuid4()
                 await db.execute(
