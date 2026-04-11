@@ -74,6 +74,14 @@ async def patch_surrender(
             ).model_dump(),
         )
 
+    if body.agent == Role.user:
+        raise HTTPException(
+            status_code=400,
+            detail=ErrorResponse(
+                error={"code": "INVALID_AGENT", "message": "agent는 agent_a 또는 agent_b여야 합니다."}
+            ).model_dump(),
+        )
+
     agent_key = body.agent.value  # "agent_a" or "agent_b"
     agent_data: dict = dict(row[agent_key])
 
