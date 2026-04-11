@@ -57,8 +57,9 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 # 라우터 등록
 # -----------------------------------------------------------------------------
-from routers import scenario
+from routers import scenario, session
 app.include_router(scenario.router)
+app.include_router(session.router)
 
 
 # -----------------------------------------------------------------------------
