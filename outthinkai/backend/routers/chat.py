@@ -43,7 +43,7 @@ validator_service = Validator()
 
 async def push_event(session_id: UUID, event_type: str, data: Any):
     if session_id in SESSION_SUBSCRIBERS:
-        event = {"event": event_type, "data": data}
+        event = {"event": event_type, "data": json.dumps(data, ensure_ascii=False)}
         # 현재 연결된 모든 클라이언트 큐에 푸시
         for queue in SESSION_SUBSCRIBERS[session_id]:
             await queue.put(event)
@@ -273,7 +273,7 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
 
         except Exception as e:
             logger.exception("Error in background agent processing")
-            await push_event(session_id, "error", {"message": str(e)})
+            await push_event(session_id, "stream_error", {"message": str(e)})
 
 async def handle_surrender(session_id: UUID, role: str):
     async with async_session() as db:

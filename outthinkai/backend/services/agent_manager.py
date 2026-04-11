@@ -32,13 +32,10 @@ async def determine_targets(session_id: UUID, db: AsyncSession) -> list:
     last_role = result.scalar()
 
     if last_role == "user":
-        # 사용자가 말했으면 Agent A가 먼저 응답
-        return ["agent_a"]
-    elif last_role == "agent_a":
-        # Agent A가 말했으면 Agent B가 응답
-        return ["agent_b"]
+        # 사용자가 말했으면 삼각 토론 구조상 양쪽 에이전트 모두 응답
+        return ["agent_a", "agent_b"]
     else:
-        # Agent B가 말했으면 다시 사용자가 말해야 함 (또는 상황에 따라 다를 수 있음)
+        # 에이전트가 마지막으로 말했으면 사용자 차례
         return []
 
 async def detect_surrender(content: str, client: AsyncOpenAI) -> bool:

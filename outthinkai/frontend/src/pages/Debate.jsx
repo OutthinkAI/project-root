@@ -376,7 +376,7 @@ export default function Debate() {
                 </span>
               </div>
               <h1 className="font-grotesk text-[32px] md:text-[40px] font-bold leading-none tracking-tight">
-                {!sessionId ? "No Active Session" : scenario?.topic || "Debate Session"}
+                {!sessionId ? "No Active Session" : session?.topic || scenario?.topic || "Debate Session"}
               </h1>
               <p className="font-mono text-[14px] text-white/40">
                 {sessionId ? "> 시스템 논리 허점을 공략하십시오_" : "> 진행 중인 시뮬레이션이 없습니다_"}
@@ -475,9 +475,8 @@ export default function Debate() {
                 )}
               </div>
 
-              {/* 우측 정보 패널 영역: 이 구역도 내부에서 따로 스크롤되게 만듭니다. */}
-              <div className="lg:col-span-4 flex flex-col bg-black/20 border border-white/5 relative overflow-hidden h-full">
-                <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 scrollbar-cyber">
+              {/* 우측 정보 패널 영역 */}
+              <div className="lg:col-span-4 flex flex-col gap-4 overflow-y-auto scrollbar-cyber min-h-0">
                   <div className="p-5 border border-white/10 bg-white/[0.02]">
                       <h3 className="font-mono text-[10px] text-white/40 uppercase tracking-[2px] mb-4">
                         Scenario Brief
@@ -503,18 +502,17 @@ export default function Debate() {
                     validator={validator}
                     sessionStatus={session?.status}
                   />
-                </div>
 
-                {session?.status === "completed" && (
-                  <div className="p-4 border-t border-[#00ffaa]/30 bg-[#00ffaa]/5 flex-shrink-0 backdrop-blur-md">
-                    <button 
-                      onClick={() => navigate(`/report/${sessionId}`)}
-                      className="w-full py-4 bg-[#00ffaa] text-black font-mono text-[13px] font-bold uppercase hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,170,0.4)] transition-all"
-                    >
-                      View Final Report →
-                    </button>
-                  </div>
-                )}
+                  {session?.status === "completed" && (
+                    <div className="p-4 border border-[#00ffaa]/30 bg-[#00ffaa]/5 backdrop-blur-md">
+                      <button
+                        onClick={() => navigate(`/report/${sessionId}`)}
+                        className="w-full py-4 bg-[#00ffaa] text-black font-mono text-[13px] font-bold uppercase hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,170,0.4)] transition-all"
+                      >
+                        View Final Report →
+                      </button>
+                    </div>
+                  )}
               </div>
 
             </div>
