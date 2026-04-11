@@ -63,9 +63,11 @@ app.add_middleware(
 from .routers.scenario import router as scenario_router
 from .routers.session import router as session_router
 from .routers.chat import router as chat_router
+from .routers.report import router as report_router
 
 app.include_router(scenario_router, prefix="/api/scenario", tags=["Scenario"])
 app.include_router(session_router, prefix="/api/session", tags=["Session"])
+app.include_router(report_router, prefix="/api/report", tags=["Report"])
 app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 
 
