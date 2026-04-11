@@ -1,9 +1,12 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from openai import APIError as OpenAIAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+
+logger = logging.getLogger(__name__)
 
 from db import get_db
 from schemas.pydantic_schemas import (
@@ -34,6 +37,7 @@ async def post_scenario_generate(
     try:
         return await generate_scenario(request, db)
     except OpenAIAPIError as e:
+        logger.exception("OpenAI API 호출 실패")
         raise HTTPException(
             status_code=500,
             detail=ErrorResponse(
@@ -41,10 +45,19 @@ async def post_scenario_generate(
             ).model_dump(),
         )
     except ValueError as e:
+        logger.exception("LLM 응답 파싱 실패")
         raise HTTPException(
             status_code=500,
             detail=ErrorResponse(
                 error={"code": "LLM_ERROR", "message": "LLM 응답 파싱에 실패했습니다.", "detail": str(e)}
+            ).model_dump(),
+        )
+    except Exception as e:
+        logger.exception("예상치 못한 에러 발생")
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorResponse(
+                error={"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다.", "detail": str(e)}
             ).model_dump(),
         )
 

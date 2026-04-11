@@ -79,7 +79,7 @@ async def _save_session(
     result = await db.execute(
         text("""
             INSERT INTO sessions (topic, scenario, agent_a, agent_b, difficulty)
-            VALUES (:topic, :scenario, :agent_a::jsonb, :agent_b::jsonb, :difficulty::difficulty_type)
+            VALUES (:topic, :scenario, cast(:agent_a as jsonb), cast(:agent_b as jsonb), cast(:difficulty as difficulty_type))
             RETURNING id, created_at
         """),
         {
