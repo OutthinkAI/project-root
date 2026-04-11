@@ -5,8 +5,8 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from prompts.scenario_prompt import SCENARIO_SYSTEM_PROMPT, SCENARIO_USER_PROMPT
-from schemas.pydantic_schemas import (
+from ..prompts.scenario_prompt import SCENARIO_SYSTEM_PROMPT, SCENARIO_USER_PROMPT
+from ..schemas.pydantic_schemas import (
     AgentPersona,
     Difficulty,
     ScenarioGenerateRequest,
