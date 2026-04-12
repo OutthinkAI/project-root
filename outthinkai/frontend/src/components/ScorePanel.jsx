@@ -7,9 +7,27 @@ const SCORE_LABELS = [
   ["speed_bonus", "Speed"],
 ];
 
-export default function ScorePanel({ totalScore = 0, validator, sessionStatus }) {
-  const breakdown = validator?.score_breakdown || {};
+function fallbackBreakdown(validator) {
+  if (!validator?.score_delta || !validator?.is_valid_rebuttal) return {};
+
+  const score = Math.max(0, Math.min(40, validator.score_delta));
+  const fallacy = validator.fallacy_addressed ? Math.min(16, Math.round(score * 0.4)) : 0;
+  const evidence = Math.min(12, Math.round(score * 0.3));
+  const terms = Math.min(8, Math.round(score * 0.2));
+  const speed = Math.min(4, Math.max(0, score - fallacy - evidence - terms));
+
+  return {
+    fallacy_identification: fallacy,
+    evidence_quality: evidence,
+    terminology_accuracy: terms,
+    speed_bonus: speed,
+  };
+}
+
+export default function ScorePanel({ totalScore = 0, validator, sessionStatus, cumulativeBreakdown }) {
+  const breakdown = cumulativeBreakdown || validator?.score_breakdown || fallbackBreakdown(validator);
   const feedback = validator?.feedback || "Awaiting logic analysis payload...";
+  const turnScoreDelta = validator?.turn_score_delta;
 
   return (
     <div className="flex flex-col gap-4 p-6 bg-white/[0.02] border border-white/10 relative overflow-hidden group hover:border-[#00aaff]/30 transition-colors">
@@ -58,6 +76,11 @@ export default function ScorePanel({ totalScore = 0, validator, sessionStatus })
         <span className="px-2 py-1 font-mono text-[9px] uppercase border bg-[#00aaff]/10 border-[#00aaff]/30 text-[#00aaff]">
           {sessionStatus === "completed" ? "Session Completed" : "Scoring Active"}
         </span>
+        {typeof turnScoreDelta === "number" && turnScoreDelta > 0 && (
+          <span className="px-2 py-1 font-mono text-[9px] uppercase border bg-[#00ffaa]/10 border-[#00ffaa]/30 text-[#00ffaa]">
+            Turn +{turnScoreDelta}
+          </span>
+        )}
       </div>
 
       {/* 피드백 텍스트 */}

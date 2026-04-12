@@ -12,6 +12,21 @@ import {
 } from "../api/client";
 
 const REPORT_STORAGE_PREFIX = "outthink-report:";
+const EMPTY_BREAKDOWN = {
+  fallacy_identification: 0,
+  evidence_quality: 0,
+  terminology_accuracy: 0,
+  speed_bonus: 0,
+};
+
+function addBreakdowns(left, right) {
+  return Object.fromEntries(
+    Object.keys(EMPTY_BREAKDOWN).map((key) => [
+      key,
+      (left?.[key] || 0) + (right?.[key] || 0),
+    ]),
+  );
+}
 
 // ---- 헬퍼 함수들 ----
 function sortMessages(messages) {
@@ -50,6 +65,7 @@ export default function Debate() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const disconnectRef = useRef(null);
   const messagesEndRef = useRef(null); // 스크롤용
+  const pendingAgentsRef = useRef(new Set());
 
   const latestRef = useRef({
     scenario: null,
@@ -66,10 +82,11 @@ export default function Debate() {
   const [messages, setMessages] = useState([]);
   const [drafts, setDrafts] = useState({ agent_a: "", agent_b: "" });
   const [validator, setValidator] = useState(null);
+  const [cumulativeBreakdown, setCumulativeBreakdown] = useState(EMPTY_BREAKDOWN);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [responseLocked, setResponseLocked] = useState(false);
   const [error, setError] = useState("");
 
   const orderedMessages = useMemo(() => sortMessages(messages), [messages]);
@@ -137,6 +154,7 @@ export default function Debate() {
         setScenario(scenarioData);
         setSession(sessionData);
         setMessages(historyData?.messages || []);
+        setCumulativeBreakdown(EMPTY_BREAKDOWN);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError.message || "Failed to load debate session.");
@@ -164,9 +182,15 @@ export default function Debate() {
     setStreaming(false);
   }
 
+  function clearResponseLock() {
+    pendingAgentsRef.current = new Set();
+    setResponseLocked(false);
+    setStreaming(false);
+  }
+
   function handleSessionComplete(payload) {
     disconnectStream();
-    setSending(false);
+    clearResponseLock();
     setDrafts({ agent_a: "", agent_b: "" });
     setSession((current) =>
       current ? { ...current, status: "completed" } : { status: "completed" },
@@ -219,8 +243,15 @@ export default function Debate() {
       },
       onValidatorResult: (payload) => {
         setValidator(payload);
-        setSending(false);
-        setStreaming(false);
+        if (payload.turn_score_breakdown) {
+          setCumulativeBreakdown((current) => addBreakdowns(current, payload.turn_score_breakdown));
+        }
+        if (payload.agent) {
+          pendingAgentsRef.current.delete(payload.agent);
+        }
+        const stillProcessing = pendingAgentsRef.current.size > 0;
+        setResponseLocked(stillProcessing);
+        setStreaming(stillProcessing);
         setSession((current) => {
           const nextTurnCount = Math.max(
             current?.turn_count || 0,
@@ -245,6 +276,7 @@ export default function Debate() {
         });
       },
       onSurrenderDetected: (payload) => {
+        clearResponseLock();
         setMessages((current) => [
           ...current,
           {
@@ -265,7 +297,7 @@ export default function Debate() {
       },
       onError: () => {
         disconnectStream();
-        setSending(false);
+        clearResponseLock();
         setError("The live stream ended unexpectedly.");
       },
     });
@@ -275,14 +307,14 @@ export default function Debate() {
     event.preventDefault();
 
     const content = input.trim();
-    if (!content || !sessionId || sending || session?.status === "completed") {
+    if (!content || !sessionId || responseLocked || session?.status === "completed") {
       return;
     }
 
     const optimisticMessage = buildUserMessage(content, (session?.turn_count || 0) + 1);
 
     setError("");
-    setSending(true);
+    setResponseLocked(true);
     setInput("");
     setMessages((current) => [...current, optimisticMessage]);
 
@@ -293,15 +325,27 @@ export default function Debate() {
           message.id === optimisticMessage.id ? response?.message || optimisticMessage : message,
         ),
       );
+      const targetAgents = (response?.target_agents || [])
+        .map((agent) => (typeof agent === "string" ? agent : agent?.value))
+        .filter(Boolean);
+      pendingAgentsRef.current = new Set(targetAgents.length > 0 ? targetAgents : ["agent_a", "agent_b"]);
+
+      if (pendingAgentsRef.current.size === 0) {
+        clearResponseLock();
+        return;
+      }
+
       startStream(sessionId);
     } catch (sendError) {
-      setSending(false);
+      clearResponseLock();
       setMessages((current) =>
         current.filter((message) => message.id !== optimisticMessage.id),
       );
       setError(sendError.message || "Failed to send message.");
     }
   }
+
+  const inputDisabled = !sessionId || responseLocked || session?.status === "completed";
 
   return (
     // 1. min-h-screen을 h-screen으로 변경하여 브라우저 높이에 딱 맞게 고정합니다.
@@ -400,15 +444,15 @@ export default function Debate() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="논리 오류를 짚고 반박을 입력하세요."
-                    disabled={!sessionId || sending || session?.status === "completed"}
+                    disabled={inputDisabled}
                     className="flex-1 bg-white/[0.03] border border-white/10 px-5 py-4 text-white font-sans text-[14px] outline-none focus:border-[#00ffaa] transition-colors placeholder:text-white/20 disabled:opacity-50"
                   />
                   <button
                     type="submit"
-                    disabled={!sessionId || sending || session?.status === "completed"}
+                    disabled={inputDisabled}
                     className="px-8 bg-[#00ffaa] text-black font-mono text-[14px] font-bold uppercase hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {sending ? "..." : "Send"}
+                    {responseLocked ? "..." : "Send"}
                   </button>
                 </form>
                 
@@ -444,6 +488,7 @@ export default function Debate() {
                   <ScorePanel
                     totalScore={session?.total_score || 0}
                     validator={validator}
+                    cumulativeBreakdown={cumulativeBreakdown}
                     sessionStatus={session?.status}
                   />
 

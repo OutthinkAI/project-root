@@ -22,6 +22,8 @@ function fallacyLabel(type) {
   return FALLACY_KO[type] || (type || "").replace(/_/g, " ");
 }
 
+const MAX_REPORT_ATTEMPTS = 10;
+
 // ---- 통계 그리드 ----
 function StatsGrid({ score, fallacyCount }) {
   const grade = score >= 90 ? "A+" : score >= 80 ? "A" : score >= 70 ? "B" : "C";
@@ -62,7 +64,7 @@ function FallacyLog({ fallacies }) {
                 <span className="font-mono text-[14px] text-white font-bold">{fallacyLabel(f.fallacy_type)}</span>
                 <span className="px-1.5 py-0.5 bg-white/10 text-white/40 font-mono text-[9px] tracking-wider">{QUALITY_KO[f.quality] || f.quality}</span>
               </div>
-              <p className="font-mono text-[11px] text-white/40">{f.turn}번째 턴에서 논리적 허점 탐지</p>
+              <p className="font-mono text-[11px] text-white/40">{f.turn}번째 토론 턴에서 논리적 허점 탐지</p>
             </div>
             <div className="hidden md:block font-mono text-[10px] text-[#00ffaa]">VERIFIED_</div>
           </div>
@@ -106,6 +108,8 @@ export default function Report() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(8);
+  const [loadingMessage, setLoadingMessage] = useState("Connecting to report engine...");
   const [errorInfo, setErrorInfo] = useState({ type: null, msg: "" });
   const [certOpen, setCertOpen] = useState(false);
 
@@ -120,14 +124,22 @@ export default function Report() {
         return;
       }
       setLoading(true);
+      setLoadingProgress(8);
+      setLoadingMessage("Connecting to report engine...");
 
       // 최대 10회(2초 간격) 폴링 — 자동 생성 완료까지 대기
-      for (let attempt = 0; attempt < 10; attempt++) {
+      for (let attempt = 0; attempt < MAX_REPORT_ATTEMPTS; attempt++) {
+        if (isMounted) {
+          setLoadingProgress(Math.min(86, 12 + attempt * 8));
+          setLoadingMessage(attempt === 0 ? "Checking existing report..." : "Waiting for report generation...");
+        }
         try {
           const data = await getReport(sessionId);
           if (isMounted) {
+            setLoadingProgress(100);
+            setLoadingMessage("Report ready.");
             setReportData(data);
-            setTimeout(() => setLoading(false), 1200);
+            setTimeout(() => setLoading(false), 500);
           }
           return;
         } catch (err) {
@@ -138,11 +150,15 @@ export default function Report() {
             }
             return;
           }
-          // 404: 아직 생성 중 — 첫 번째 시도에서만 generate 요청
+          // 404: report is still being generated.
           if (attempt === 0) {
-            try { await generateReport(sessionId); } catch { /* 이미 생성 중이면 무시 */ }
+            if (isMounted) {
+              setLoadingProgress(32);
+              setLoadingMessage("Generating proof report...");
+            }
+            try { await generateReport(sessionId); } catch { /* already generating; keep polling */ }
           }
-          if (attempt < 9) await new Promise((r) => setTimeout(r, 2000));
+          if (attempt < MAX_REPORT_ATTEMPTS - 1) await new Promise((r) => setTimeout(r, 2000));
         }
       }
 
@@ -156,11 +172,11 @@ export default function Report() {
   }, [sessionId]);
 
   return (
-    <div className="relative flex min-h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#00ffaa]/30 font-sans">
+    <div className="relative flex h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#00ffaa]/30 font-sans">
       {/* 1. 사이드바는 항상 렌더링 (최상단) */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="relative flex-1 flex flex-col min-w-0 overflow-auto z-10">
+      <main className="relative flex-1 flex flex-col h-full min-w-0 overflow-auto z-10">
         {/* 2. 로딩 중일 때 - 메인 영역 내부에 작은 박스 띄우기 */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -173,9 +189,15 @@ export default function Report() {
                   <div className="w-1.5 h-1.5 bg-[#00ffaa] animate-ping" />
                 </div>
                 <div className="h-px bg-white/10 overflow-hidden">
-                  <div className="h-full bg-[#00ffaa] animate-[loading_2s_infinite]" style={{ width: '40%' }} />
+                  <div
+                    className="h-full bg-[#00ffaa] transition-[width] duration-500 ease-out"
+                    style={{ width: `${loadingProgress}%` }}
+                  />
                 </div>
-                <p className="font-mono text-[11px] text-white/30 italic">데이터 무결성 확인 중_</p>
+                <div className="flex justify-between items-center gap-4">
+                  <p className="font-mono text-[11px] text-white/30 italic">{loadingMessage}</p>
+                  <span className="font-mono text-[10px] text-white/40">{loadingProgress}%</span>
+                </div>
               </div>
             </div>
           </div>

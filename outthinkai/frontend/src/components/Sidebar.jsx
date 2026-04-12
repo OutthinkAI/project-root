@@ -33,6 +33,21 @@ const navItems = [
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
+  const sessionMatch = location.pathname.match(/^\/(?:debate|report)\/([^/?#]+)/);
+  const sessionId = sessionMatch?.[1] || new URLSearchParams(location.search).get("sessionId");
+  const isDebatePage = location.pathname.startsWith("/debate");
+  const isReportPage = location.pathname.startsWith("/report");
+
+  function resolveHref(href) {
+    if (!sessionId) return href;
+    if (href === "/debate") return `/debate/${sessionId}`;
+    if (href === "/report") return `/report/${sessionId}`;
+    return href;
+  }
+
+  function isBlocked(href) {
+    return (isDebatePage && href === "/report") || (isReportPage && href === "/debate");
+  }
 
   return (
     <>
@@ -63,21 +78,50 @@ export default function Sidebar({ isOpen, onClose }) {
           </div>
           <div className="flex flex-col">
             {navItems.map((item) => {
+              const href = resolveHref(item.href);
+              const blocked = isBlocked(item.href);
               const isActive =
                 location.pathname === item.href ||
                 (item.href !== "/" && location.pathname.startsWith(item.href));
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={onClose}
-                  className={`flex items-center gap-3 px-4 py-3 relative ${isActive ? "bg-[#00ffaa]/5" : "hover:bg-white/5"} transition-colors`}
-                >
+              const className = `flex items-center gap-3 px-4 py-3 relative transition-colors ${
+                blocked
+                  ? "opacity-30 cursor-not-allowed"
+                  : isActive
+                  ? "bg-[#00ffaa]/5"
+                  : "hover:bg-white/5"
+              }`;
+
+              const content = (
+                <>
                   <span className={isActive ? "text-white" : "text-white/60"}>{item.icon}</span>
                   {isActive && <div className="absolute left-0 top-[8.8px] w-[3px] h-[26px] bg-[#00ffaa]" />}
                   <span className={`font-mono text-[14px] font-normal leading-5 ${isActive ? "text-white" : "text-white/60"}`}>
                     {item.label}
                   </span>
+                </>
+              );
+
+              if (blocked) {
+                return (
+                  <div
+                    key={item.href}
+                    className={className}
+                    aria-disabled="true"
+                    title="현재 단계에서는 이동할 수 없습니다."
+                  >
+                    {content}
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  to={href}
+                  onClick={onClose}
+                  className={className}
+                >
+                  {content}
                 </Link>
               );
             })}

@@ -93,7 +93,7 @@ export default function ChatBubble({
 
             {typeof scoreDelta === "number" && scoreDelta > 0 && (
               <span className="font-mono text-[11px] font-bold text-[#00ffaa] uppercase tracking-[1px]">
-                + {scoreDelta} PoT Score Gained
+                Validator Score {scoreDelta} / 40
               </span>
             )}
             
