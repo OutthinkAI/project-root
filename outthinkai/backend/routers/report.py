@@ -40,14 +40,6 @@ async def post_report_generate(
             ).model_dump(),
         )
 
-    if session_row["status"] != "completed":
-        raise HTTPException(
-            status_code=409,
-            detail=ErrorResponse(
-                error={"code": "SESSION_NOT_COMPLETED", "message": "아직 완료되지 않은 세션입니다."}
-            ).model_dump(),
-        )
-
     # 이미 리포트 존재 여부 확인
     res_report = await db.execute(
         text("SELECT id FROM reports WHERE session_id = :sid"),
