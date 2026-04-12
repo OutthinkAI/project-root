@@ -83,14 +83,22 @@ export function connectStream({
     es.close();
   });
 
-  es.addEventListener('error', (e) => {
+  // 백엔드 애플리케이션 에러 (event: stream_error)
+  es.addEventListener('stream_error', (e) => {
+    console.error('Stream error from server:', JSON.parse(e.data));
+    if (onError) onError(e);
+    es.close();
+  });
+
+  // 네트워크/연결 레벨 에러 (native EventSource error)
+  es.onerror = (e) => {
     if (es.readyState === EventSource.CLOSED) {
       console.log('SSE connection closed naturally.');
     } else {
       if (onError) onError(e);
+      es.close();
     }
-    es.close();
-  });
+  };
 
   // Debate.jsx의 disconnectRef.current?.() 호출을 지원하기 위한 클린업 함수 반환
   return () => {
