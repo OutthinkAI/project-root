@@ -110,34 +110,36 @@ export default function Report() {
         setErrorInfo({ type: "BAD_REQUEST", msg: "Invalid Session ID" });
         return;
       }
-      try {
-        setLoading(true);
-        const data = await getReport(sessionId);
-        if (isMounted) {
-          setReportData(data);
-          setTimeout(() => setLoading(false), 1200);
-        }
-      } catch (err) {
-        if (err.response?.status === 404) {
-          try {
-            await generateReport(sessionId);
-            const data = await getReport(sessionId);
+      setLoading(true);
+
+      // 최대 10회(2초 간격) 폴링 — 자동 생성 완료까지 대기
+      for (let attempt = 0; attempt < 10; attempt++) {
+        try {
+          const data = await getReport(sessionId);
+          if (isMounted) {
+            setReportData(data);
+            setTimeout(() => setLoading(false), 1200);
+          }
+          return;
+        } catch (err) {
+          if (err.response?.status !== 404) {
             if (isMounted) {
-              setReportData(data);
-              setTimeout(() => setLoading(false), 1200);
-            }
-          } catch {
-            if (isMounted) {
-              setErrorInfo({ type: "SERVER_ERROR", msg: "리포트 생성에 실패했습니다." });
+              setErrorInfo({ type: "SERVER_ERROR", msg: "분석 데이터를 불러오지 못했습니다." });
               setLoading(false);
             }
+            return;
           }
-        } else {
-          if (isMounted) {
-            setErrorInfo({ type: "SERVER_ERROR", msg: "분석 데이터를 불러오지 못했습니다." });
-            setLoading(false);
+          // 404: 아직 생성 중 — 첫 번째 시도에서만 generate 요청
+          if (attempt === 0) {
+            try { await generateReport(sessionId); } catch { /* 이미 생성 중이면 무시 */ }
           }
+          if (attempt < 9) await new Promise((r) => setTimeout(r, 2000));
         }
+      }
+
+      if (isMounted) {
+        setErrorInfo({ type: "SERVER_ERROR", msg: "리포트 생성 시간이 초과되었습니다." });
+        setLoading(false);
       }
     }
     load();

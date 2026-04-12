@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from openai import APIError as OpenAIAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from ..db import get_db
 from ..schemas.pydantic_schemas import (
@@ -40,21 +41,44 @@ async def post_report_generate(
             ).model_dump(),
         )
 
-    # 이미 리포트 존재 여부 확인
+    # 이미 리포트 존재 여부 확인 → 있으면 그대로 반환
     res_report = await db.execute(
-        text("SELECT id FROM reports WHERE session_id = :sid"),
+        text("SELECT * FROM reports WHERE session_id = :sid"),
         {"sid": str(request.session_id)},
     )
-    if res_report.mappings().one_or_none():
-        raise HTTPException(
-            status_code=409,
-            detail=ErrorResponse(
-                error={"code": "REPORT_ALREADY_EXISTS", "message": "이미 리포트가 존재하는 세션입니다."}
-            ).model_dump(),
+    existing = res_report.mappings().one_or_none()
+    if existing:
+        return ReportResponse(
+            report_id=existing["id"],
+            session_id=existing["session_id"],
+            total_score=existing["total_score"],
+            fallacies_caught=[FallacyCaught(**f) for f in existing["fallacies_caught"]],
+            strengths=existing["strengths"],
+            improvements=existing["improvements"],
+            summary=existing["summary"],
+            created_at=existing["created_at"],
         )
 
     try:
         return await generate_report(request.session_id, db)
+    except IntegrityError:
+        # 동시 요청으로 중복 INSERT → 이미 생성된 리포트 반환
+        await db.rollback()
+        res_retry = await db.execute(
+            text("SELECT * FROM reports WHERE session_id = :sid"),
+            {"sid": str(request.session_id)},
+        )
+        row = res_retry.mappings().one()
+        return ReportResponse(
+            report_id=row["id"],
+            session_id=row["session_id"],
+            total_score=row["total_score"],
+            fallacies_caught=[FallacyCaught(**f) for f in row["fallacies_caught"]],
+            strengths=row["strengths"],
+            improvements=row["improvements"],
+            summary=row["summary"],
+            created_at=row["created_at"],
+        )
     except OpenAIAPIError as e:
         logger.exception("리포트 생성 LLM 호출 실패")
         raise HTTPException(
