@@ -45,8 +45,10 @@ export default function ChatBubble({
   isStreaming = false,
   feedback,
   scoreDelta,
+  agentName,
 }) {
   const meta = ROLE_META[role] || ROLE_META.user;
+  const displayName = agentName || meta.label;
   const isUser = role === "user";
 
   return (
@@ -65,7 +67,7 @@ export default function ChatBubble({
         {/* 헤더 (이름, 시간) */}
         <div className={`flex items-center gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
           <span className={`font-mono text-[11px] font-bold uppercase tracking-wider ${meta.textClass}`}>
-            {meta.label}
+            {displayName}
           </span>
           <span className="font-mono text-[10px] text-white/30">
             {formatTime(createdAt)}

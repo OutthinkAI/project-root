@@ -1,117 +1,41 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
 import { getReport, generateReport } from "../api/client";
+import Sidebar from "../components/Sidebar";
 
-// ---- [복구] 하위 컴포넌트: 사이드바 (원본 디자인 & 아이콘 & 사용자 정보 완벽 복구) ----
-const navItems = [
-  {
-    label: "미션 센터", href: "/", section: "메인",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-        <path d="M6.66667 2H2V6.66667H6.66667V2Z" stroke="currentColor" strokeWidth="0.666667"/>
-        <path d="M14.0002 2H9.3335V6.66667H14.0002V2Z" stroke="currentColor" strokeWidth="0.666667"/>
-        <path d="M6.66667 9.33337H2V14H6.66667V9.33337Z" stroke="currentColor" strokeWidth="0.666667"/>
-        <path d="M14.0002 9.33337H9.3335V14H14.0002V9.33337Z" stroke="currentColor" strokeWidth="0.666667"/>
-      </svg>
-    ),
-  },
-  {
-    label: "삼각 토론", href: "/debate", section: null,
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-        <path d="M5.33333 7.99996H5.34M8 7.99996H8.00667M10.6667 7.99996H10.6733M14 7.99996C14 10.9453 11.3133 13.3333 8 13.3333C7.01909 13.3366 6.04986 13.1205 5.16333 12.7006L2 13.3333L2.93 10.8533C2.34133 10.028 2 9.04929 2 7.99996C2 5.05463 4.68667 2.66663 8 2.66663C11.3133 2.66663 14 5.05463 14 7.99996Z" stroke="currentColor" strokeOpacity="0.6" strokeWidth="0.666667"/>
-      </svg>
-    ),
-  },
-  {
-    label: "사고 증명", href: "/report", section: null,
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-        <path d="M6.00016 11.3333V10M8.00016 11.3333V8.66667M10.0002 11.3333V7.33333M11.3335 14H4.66683C4.31321 14 3.97407 13.8595 3.72402 13.6095C3.47397 13.3594 3.3335 13.0203 3.3335 12.6667V3.33333C3.3335 2.97971 3.47397 2.64057 3.72402 2.39052C3.97407 2.14048 4.31321 2 4.66683 2H8.39083C8.56763 2.00004 8.73717 2.0703 8.86216 2.19533L12.4715 5.80467C12.5965 5.92966 12.6668 6.0992 12.6668 6.276V12.6667C12.6668 13.0203 12.5264 13.3594 12.2763 13.6095C12.0263 13.8595 11.6871 14 11.3335 14Z" stroke="currentColor" strokeOpacity="0.6" strokeWidth="0.666667"/>
-      </svg>
-    ),
-  },
-];
+const FALLACY_KO = {
+  appeal_to_authority: "권위에 호소",
+  false_dichotomy: "거짓 이분법",
+  hasty_generalization: "성급한 일반화",
+  straw_man: "허수아비 논증",
+  ad_hominem: "인신공격",
+  slippery_slope: "미끄러운 경사면",
+  circular_reasoning: "순환 논리",
+  appeal_to_emotion: "감정에 호소",
+  false_cause: "잘못된 인과관계",
+  bandwagon: "다수에 호소",
+};
 
-function Sidebar({ isOpen, onClose }) {
-  const location = useLocation();
-  return (
-    <>
-      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />}
-      <aside className={`fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-64 flex flex-col flex-shrink-0 border-r border-white/10 bg-black/50 backdrop-blur-sm transition-transform duration-200 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex flex-col gap-[3px] p-6 border-b border-white/10">
-          <div className="font-mono text-[18px] font-bold leading-7">
-            <span className="text-[#00ffaa]">LOGIC</span><span className="text-white/20">_</span><span className="text-[#ff00aa]">DBG</span>
-          </div>
-          <div className="font-mono text-[9px] font-normal text-white/30 tracking-[0.9px] uppercase">비판적 사고 훈련</div>
-        </div>
+const QUALITY_KO = { good: "우수", partial: "부분", poor: "미흡" };
 
-        <div className="flex items-center gap-3 p-4 border-b border-white/10">
-          <div className="w-10 h-10 flex items-center justify-center bg-[#00ffaa] flex-shrink-0">
-            <span className="font-mono text-[16px] font-bold text-black">김</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-mono text-[14px] font-medium text-white leading-5">김서연</span>
-            <span className="font-mono text-[10px] text-[#00ffaa] uppercase leading-[15px]">LV.7 분석가</span>
-          </div>
-        </div>
-
-        <nav className="flex-1 flex flex-col py-[15px]">
-          <div className="px-4 mb-[15px]"><span className="font-mono text-[9px] text-white/30 tracking-[0.9px] uppercase">메인</span></div>
-          <div className="flex flex-col">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.href || (item.href !== "/" && location.pathname.startsWith(item.href));
-              return (
-                <Link key={item.href} to={item.href} onClick={onClose} className={`flex items-center gap-3 px-4 py-3 relative ${isActive ? "bg-[#00ffaa]/5" : "hover:bg-white/5"} transition-colors`}>
-                  <span className={isActive ? "text-white" : "text-white/60"}>{item.icon}</span>
-                  {isActive && <div className="absolute left-0 top-[8.8px] w-[3px] h-[26px] bg-[#00ffaa]" />}
-                  <span className={`font-mono text-[14px] font-normal leading-5 ${isActive ? "text-white" : "text-white/60"}`}>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-
-        <div className="flex flex-col gap-1 p-4 border-t border-white/10">
-          <div className="flex justify-between items-center">
-            <span className="font-mono text-[9px] text-white/30">일일 할당량</span>
-            <span className="font-mono text-[9px] text-[#00ffaa]">7/10</span>
-          </div>
-          <div className="h-1 bg-white/10 overflow-hidden">
-            <div className="h-full bg-[#00ffaa]" style={{ width: "70%" }} />
-          </div>
-        </div>
-      </aside>
-    </>
-  );
+function fallacyLabel(type) {
+  return FALLACY_KO[type] || (type || "").replace(/_/g, " ");
 }
 
-// ---- [복구] 하위 컴포넌트: 아이콘 ----
-const DownloadIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8 10V3M8 10L6 8M8 10L10 8M3 13H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M14 2L2 7L7.5 8.5L9 14L14 2Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-// ---- [복구] 하위 컴포넌트: 통계 그리드 ----
+// ---- 통계 그리드 ----
 function StatsGrid({ score, fallacyCount }) {
+  const grade = score >= 90 ? "A+" : score >= 80 ? "A" : score >= 70 ? "B" : "C";
   const stats = [
-    { label: "Final PoT Score", value: score, sub: "Total Points", color: "text-[#00ffaa]" },
-    { label: "Logic Grade", value: score >= 90 ? "A+" : score >= 80 ? "A" : score >= 70 ? "B" : "C", sub: "Performance", color: "text-white" },
-    { label: "Fallacies Caught", value: fallacyCount, sub: "Errors Identified", color: "text-[#ff00aa]" },
-    { label: "Verification", value: "SECURE", sub: "Blockchain Hash", color: "text-[#00aaff]" },
+    { label: "최종 PoT 점수", value: score, sub: "총 획득 점수", color: "text-[#00ffaa]" },
+    { label: "논리 등급", value: grade, sub: "사고력 평가", color: "text-white" },
+    { label: "탐지한 오류", value: fallacyCount, sub: "논리적 허점 수", color: "text-[#ff00aa]" },
+    { label: "검증 상태", value: "SECURE", sub: "AI 엔진 인증", color: "text-[#00aaff]" },
   ];
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10">
       {stats.map((stat, i) => (
         <div key={i} className="bg-black p-6 flex flex-col items-center justify-center gap-1">
-          <span className="font-mono text-[9px] text-white/40 uppercase tracking-[2px]">{stat.label}</span>
+          <span className="font-mono text-[9px] text-white/40 tracking-[2px] uppercase">{stat.label}</span>
           <span className={`font-grotesk text-[32px] font-bold ${stat.color}`}>{stat.value}</span>
           <span className="font-mono text-[9px] text-white/20 uppercase tracking-[1px]">{stat.sub}</span>
         </div>
@@ -120,14 +44,14 @@ function StatsGrid({ score, fallacyCount }) {
   );
 }
 
-// ---- [복구] 하위 컴포넌트: 오류 탐지 로그 ----
+// ---- 오류 탐지 로그 ----
 function FallacyLog({ fallacies }) {
   if (!fallacies || fallacies.length === 0) return null;
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between items-center px-1">
-        <h3 className="font-mono text-[12px] text-[#ff00aa] uppercase tracking-[2px]">Detected Fallacies</h3>
-        <span className="font-mono text-[10px] text-white/20">LOGS: {fallacies.length} ITEMS</span>
+        <h3 className="font-mono text-[12px] text-[#ff00aa] uppercase tracking-[2px]">탐지된 논리 오류</h3>
+        <span className="font-mono text-[10px] text-white/20">총 {fallacies.length}건</span>
       </div>
       <div className="flex flex-col gap-2">
         {fallacies.map((f, i) => (
@@ -135,10 +59,10 @@ function FallacyLog({ fallacies }) {
             <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-[#ff00aa]/10 text-[#ff00aa] font-mono text-[14px] font-bold group-hover:bg-[#ff00aa] group-hover:text-black transition-all">{f.turn}</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-mono text-[14px] text-white font-bold uppercase">{(f.fallacy_type || "").replace(/_/g, ' ')}</span>
-                <span className="px-1.5 py-0.5 bg-white/10 text-white/40 font-mono text-[9px] uppercase tracking-wider">{f.quality}</span>
+                <span className="font-mono text-[14px] text-white font-bold">{fallacyLabel(f.fallacy_type)}</span>
+                <span className="px-1.5 py-0.5 bg-white/10 text-white/40 font-mono text-[9px] tracking-wider">{QUALITY_KO[f.quality] || f.quality}</span>
               </div>
-              <p className="font-mono text-[11px] text-white/40 truncate">에이전트의 논리적 허점을 {f.turn}번째 턴에서 탐지하였습니다.</p>
+              <p className="font-mono text-[11px] text-white/40">{f.turn}번째 턴에서 논리적 허점 탐지</p>
             </div>
             <div className="hidden md:block font-mono text-[10px] text-[#00ffaa]">VERIFIED_</div>
           </div>
@@ -148,25 +72,25 @@ function FallacyLog({ fallacies }) {
   );
 }
 
-// ---- [복구] 하위 컴포넌트: 강점/약점 분석 ----
+// ---- 강점/개선점 분석 ----
 function CritiqueSection({ strengths, improvements }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="p-6 bg-[#00ffaa]/5 border border-[#00ffaa]/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-2 opacity-10"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#00ffaa" strokeWidth="1"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-        <h3 className="font-mono text-[12px] text-[#00ffaa] mb-4 uppercase tracking-[2px]">Logical Strengths</h3>
+        <h3 className="font-mono text-[12px] text-[#00ffaa] mb-4 tracking-[2px]">논리적 강점</h3>
         <ul className="flex flex-col gap-3">
           {(strengths || []).map((s, i) => (
-            <li key={i} className="font-mono text-[13px] text-white/80 leading-relaxed flex gap-3 italic"><span className="text-[#00ffaa]">+</span> {s}</li>
+            <li key={i} className="font-mono text-[13px] text-white/80 leading-relaxed flex gap-3"><span className="text-[#00ffaa] flex-shrink-0">+</span>{s}</li>
           ))}
         </ul>
       </div>
       <div className="p-6 bg-[#ff00aa]/5 border border-[#ff00aa]/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-2 opacity-10"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ff00aa" strokeWidth="1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-        <h3 className="font-mono text-[12px] text-[#ff00aa] mb-4 uppercase tracking-[2px]">Improvement Required</h3>
+        <h3 className="font-mono text-[12px] text-[#ff00aa] mb-4 tracking-[2px]">개선 필요 영역</h3>
         <ul className="flex flex-col gap-3">
           {(improvements || []).map((imp, i) => (
-            <li key={i} className="font-mono text-[13px] text-white/80 leading-relaxed flex gap-3 italic"><span className="text-[#ff00aa]">!</span> {imp}</li>
+            <li key={i} className="font-mono text-[13px] text-white/80 leading-relaxed flex gap-3"><span className="text-[#ff00aa] flex-shrink-0">!</span>{imp}</li>
           ))}
         </ul>
       </div>
@@ -174,14 +98,16 @@ function CritiqueSection({ strengths, improvements }) {
   );
 }
 
-// ---- 메인 Report 페이지 (핵심: 사이드바 유지 + 영역 로딩/에러) ----
+// ---- 메인 Report 페이지 ----
 export default function Report() {
   const { sessionId: pathId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorInfo, setErrorInfo] = useState({ type: null, msg: "" });
+  const [certOpen, setCertOpen] = useState(false);
 
   const sessionId = pathId || searchParams.get("sessionId") || "";
 
@@ -193,18 +119,36 @@ export default function Report() {
         setErrorInfo({ type: "BAD_REQUEST", msg: "Invalid Session ID" });
         return;
       }
-      try {
-        setLoading(true);
-        const data = await getReport(sessionId);
-        if (isMounted) {
-          setReportData(data);
-          setTimeout(() => setLoading(false), 1200); // 연출 지연
+      setLoading(true);
+
+      // 최대 10회(2초 간격) 폴링 — 자동 생성 완료까지 대기
+      for (let attempt = 0; attempt < 10; attempt++) {
+        try {
+          const data = await getReport(sessionId);
+          if (isMounted) {
+            setReportData(data);
+            setTimeout(() => setLoading(false), 1200);
+          }
+          return;
+        } catch (err) {
+          if (err.response?.status !== 404) {
+            if (isMounted) {
+              setErrorInfo({ type: "SERVER_ERROR", msg: "분석 데이터를 불러오지 못했습니다." });
+              setLoading(false);
+            }
+            return;
+          }
+          // 404: 아직 생성 중 — 첫 번째 시도에서만 generate 요청
+          if (attempt === 0) {
+            try { await generateReport(sessionId); } catch { /* 이미 생성 중이면 무시 */ }
+          }
+          if (attempt < 9) await new Promise((r) => setTimeout(r, 2000));
         }
-      } catch (err) {
-        if (isMounted) {
-          setErrorInfo({ type: err.response?.status === 404 ? "NOT_FOUND" : "SERVER_ERROR", msg: "분석 데이터를 불러오지 못했습니다." });
-          setLoading(false);
-        }
+      }
+
+      if (isMounted) {
+        setErrorInfo({ type: "SERVER_ERROR", msg: "리포트 생성 시간이 초과되었습니다." });
+        setLoading(false);
       }
     }
     load();
@@ -256,20 +200,13 @@ export default function Report() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
                   <span className="px-2 py-0.5 bg-[#00ffaa] text-black font-mono text-[10px] font-bold uppercase">Proof of Thought</span>
-                  <span className="font-mono text-[11px] text-white/40 tracking-wider font-bold">{(reportData.report_id || "").toUpperCase()}</span>
                 </div>
                 <h1 className="font-grotesk text-[36px] md:text-[42px] font-bold tracking-tight uppercase">Logic Debugging Report</h1>
                 <p className="font-mono text-[14px] text-white/40 italic">{">"} 분석이 완료되었습니다. 결과가 분산 원장에 기록되었습니다_</p>
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 border border-white/10 hover:bg-white/5 font-mono text-[12px] uppercase transition-all">
-                  <DownloadIcon /> PDF
-                </button>
-                <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3 bg-[#00ffaa] text-black font-bold font-mono text-[12px] uppercase hover:bg-white transition-all">
-                  <SendIcon /> Submit
-                </button>
-                <Link to="/" className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3 bg-white/10 text-white font-mono text-[12px] uppercase hover:bg-white/20 transition-all">
-                  New Session
+                <Link to="/" className="flex-1 md:flex-none flex items-center justify-center gap-2 px-8 py-3 bg-[#00ffaa] text-black font-bold font-mono text-[12px] uppercase hover:bg-white transition-all">
+                  새 미션 시작
                 </Link>
               </div>
             </div>
@@ -278,7 +215,7 @@ export default function Report() {
             <div className="relative p-8 bg-white/[0.03] border-l-4 border-[#00ffaa]">
               <span className="absolute top-4 right-6 font-mono text-[50px] text-white/[0.03] pointer-events-none select-none italic font-black">SUMMARY</span>
               <div className="relative z-10">
-                <h3 className="font-mono text-[10px] text-[#00ffaa] uppercase tracking-[2px] mb-4">Executive Summary</h3>
+                <h3 className="font-mono text-[10px] text-[#00ffaa] uppercase tracking-[2px] mb-4">종합 평가</h3>
                 <p className="font-mono text-[16px] md:text-[18px] text-white leading-relaxed italic">
                   "{reportData.summary}"
                 </p>
@@ -310,19 +247,46 @@ export default function Report() {
                     </div>
                     <div className="flex flex-col gap-2 py-4 border-y border-white/5">
                       <div className="flex justify-between font-mono text-[11px]"><span className="text-white/40 text-left">TIMESTAMP</span><span className="text-right">{new Date(reportData.created_at).toLocaleString()}</span></div>
-                      <div className="flex justify-between font-mono text-[11px]"><span className="text-white/40 text-left">HASH_ID</span><span className="text-right truncate ml-4">0x{(reportData.report_id || "").slice(0, 8).toUpperCase()}...</span></div>
                       <div className="flex justify-between font-mono text-[11px]"><span className="text-white/40 text-left">VALIDATOR</span><span className="text-right">GPT-4O CORE</span></div>
                     </div>
-                    <p className="font-mono text-[11px] text-white/30 leading-relaxed">본 분석 결과는 분산 원장에 기록되었으며 위변조가 불가능합니다. 해시값을 통해 인증서 진위 여부를 확인할 수 있습니다.</p>
-                    <button className="w-full py-4 border border-[#00ffaa] text-[#00ffaa] font-mono text-[12px] font-bold uppercase hover:bg-[#00ffaa] hover:text-black transition-all">인증 상세 정보 확인</button>
+                    <p className="font-mono text-[11px] text-white/30 leading-relaxed">본 분석 결과는 LogicDBG AI 엔진에 의해 검증되었습니다. 세션 ID로 결과 진위를 확인할 수 있습니다.</p>
+                    <button
+                      onClick={() => setCertOpen((v) => !v)}
+                      className="w-full py-4 border border-[#00ffaa] text-[#00ffaa] font-mono text-[12px] font-bold uppercase hover:bg-[#00ffaa] hover:text-black transition-all"
+                    >
+                      {certOpen ? "인증 정보 닫기 ▲" : "인증 상세 정보 확인 ▼"}
+                    </button>
+                    {certOpen && (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                        <div className="flex justify-between font-mono text-[10px]">
+                          <span className="text-white/30">VALIDATOR</span>
+                          <span className="text-white/70">GPT-4O CORE</span>
+                        </div>
+                        <div className="flex justify-between font-mono text-[10px]">
+                          <span className="text-white/30">GENERATED</span>
+                          <span className="text-white/70">{new Date(reportData.created_at).toLocaleString("ko-KR")}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="p-6 border border-white/5 bg-white/[0.01]">
-                  <h3 className="font-mono text-[10px] text-white/40 uppercase tracking-[2px] mb-4 underline">Next Training Phase</h3>
+                  <h3 className="font-mono text-[10px] text-white/40 uppercase tracking-[2px] mb-4">다음 훈련 단계</h3>
                   <div className="flex flex-col gap-4">
-                    <p className="font-mono text-[12px] text-white/60">당신의 논증 패턴을 분석한 결과, '경제/정치' 분야의 논리 구조 학습을 추천합니다.</p>
-                    <button className="text-[#00ffaa] font-mono text-[12px] text-left hover:underline">추천 미션 바로가기 →</button>
+                    <p className="font-mono text-[12px] text-white/60 leading-relaxed">
+                      {reportData.total_score >= 80
+                        ? "우수한 논리력을 보여주셨습니다. 더 고난도의 논리 오류 유형에 도전해 실력을 높여보세요."
+                        : reportData.total_score >= 50
+                        ? "기본적인 오류 탐지 능력을 갖추고 있습니다. 개선 사항을 참고하여 반박 논리를 강화해보세요."
+                        : "새로운 주제로 다시 도전하여 논리적 사고력을 단계적으로 향상시켜보세요."}
+                    </p>
+                    <button
+                      onClick={() => navigate("/")}
+                      className="text-[#00ffaa] font-mono text-[12px] text-left hover:underline"
+                    >
+                      새 미션 시작하기 →
+                    </button>
                   </div>
                 </div>
               </div>
