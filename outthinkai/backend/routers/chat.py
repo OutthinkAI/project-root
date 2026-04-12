@@ -294,6 +294,19 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
             await push_event(session_id, "stream_error", {"message": str(e)})
 
 async def handle_surrender(session_id: UUID, role: str):
+    # 유저가 포기한 경우 → 즉시 세션 종료 후 리포트 생성
+    if role == "user":
+        async with async_session() as db:
+            await db.execute(
+                text("UPDATE sessions SET status = cast('completed' as session_status) WHERE id = :sid"),
+                {"sid": str(session_id)},
+            )
+            await db.commit()
+        await push_event(session_id, "surrender_detected", {"agent": "user", "both_surrendered": True})
+        await push_event(session_id, "session_complete", {"session_id": str(session_id)})
+        asyncio.create_task(_auto_generate_report(session_id))
+        return
+
     async with async_session() as db:
         # 항복한 에이전트 surrendered = true 업데이트
         res = await db.execute(
