@@ -34,8 +34,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+MAX_USER_TURNS = 5  # 사용자가 5번 메시지를 보내면 세션 종료
+
 # SSE Subscriber storage: session_id -> Set of asyncio.Queues
-# 이를 통해 1:N 브로드캐스트 지원 및 메모리 관리 가능
 SESSION_SUBSCRIBERS: Dict[UUID, List[asyncio.Queue]] = {}
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -270,6 +271,23 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
 
                 if await detect_surrender(full_content, client):
                     await handle_surrender(session_id, agent_key)
+                    return  # 항복 처리 후 종료
+
+            # 에이전트 응답 완료 후 최대 턴 수 체크
+            user_count_res = await db.execute(
+                text("SELECT COUNT(*) FROM messages WHERE session_id = :sid AND role = 'user'"),
+                {"sid": str(session_id)}
+            )
+            user_turn_count = user_count_res.scalar()
+
+            if user_turn_count >= MAX_USER_TURNS:
+                await db.execute(
+                    text("UPDATE sessions SET status = cast('completed' as session_status) WHERE id = :sid"),
+                    {"sid": str(session_id)}
+                )
+                await db.commit()
+                await push_event(session_id, "session_complete", {"session_id": str(session_id)})
+                asyncio.create_task(_auto_generate_report(session_id))
 
         except Exception as e:
             logger.exception("Error in background agent processing")
@@ -310,3 +328,22 @@ async def handle_surrender(session_id: UUID, role: str):
 
     if both_surrendered:
         await push_event(session_id, "session_complete", {"session_id": str(session_id)})
+        asyncio.create_task(_auto_generate_report(session_id))
+
+
+async def _auto_generate_report(session_id: UUID):
+    """세션 완료 시 리포트를 자동 생성합니다."""
+    from ..services.report_generator import generate_report
+    try:
+        async with async_session() as db:
+            # 이미 리포트가 있으면 스킵
+            res = await db.execute(
+                text("SELECT id FROM reports WHERE session_id = :sid"),
+                {"sid": str(session_id)}
+            )
+            if res.mappings().one_or_none():
+                return
+            await generate_report(session_id, db)
+            logger.info(f"Auto-generated report for session {session_id}")
+    except Exception:
+        logger.exception(f"Auto report generation failed for session {session_id}")
