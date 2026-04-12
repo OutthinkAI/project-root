@@ -17,7 +17,7 @@ from ..services.report_generator import generate_report
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/report", tags=["Report"])
+router = APIRouter()
 
 
 @router.post("/generate", response_model=ReportResponse)
