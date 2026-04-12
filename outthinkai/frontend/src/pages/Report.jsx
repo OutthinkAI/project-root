@@ -200,7 +200,6 @@ export default function Report() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
                   <span className="px-2 py-0.5 bg-[#00ffaa] text-black font-mono text-[10px] font-bold uppercase">Proof of Thought</span>
-                  <span className="font-mono text-[11px] text-white/40 tracking-wider font-bold">{(reportData.report_id || "").toUpperCase()}</span>
                 </div>
                 <h1 className="font-grotesk text-[36px] md:text-[42px] font-bold tracking-tight uppercase">Logic Debugging Report</h1>
                 <p className="font-mono text-[14px] text-white/40 italic">{">"} 분석이 완료되었습니다. 결과가 분산 원장에 기록되었습니다_</p>
@@ -248,7 +247,6 @@ export default function Report() {
                     </div>
                     <div className="flex flex-col gap-2 py-4 border-y border-white/5">
                       <div className="flex justify-between font-mono text-[11px]"><span className="text-white/40 text-left">TIMESTAMP</span><span className="text-right">{new Date(reportData.created_at).toLocaleString()}</span></div>
-                      <div className="flex justify-between font-mono text-[11px]"><span className="text-white/40 text-left">HASH_ID</span><span className="text-right truncate ml-4">0x{(reportData.report_id || "").slice(0, 8).toUpperCase()}...</span></div>
                       <div className="flex justify-between font-mono text-[11px]"><span className="text-white/40 text-left">VALIDATOR</span><span className="text-right">GPT-4O CORE</span></div>
                     </div>
                     <p className="font-mono text-[11px] text-white/30 leading-relaxed">본 분석 결과는 LogicDBG AI 엔진에 의해 검증되었습니다. 세션 ID로 결과 진위를 확인할 수 있습니다.</p>
@@ -260,14 +258,6 @@ export default function Report() {
                     </button>
                     {certOpen && (
                       <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-                        <div className="flex flex-col gap-1 font-mono text-[10px]">
-                          <span className="text-white/30">REPORT ID</span>
-                          <span className="text-white/70 break-all">{reportData.report_id}</span>
-                        </div>
-                        <div className="flex flex-col gap-1 font-mono text-[10px]">
-                          <span className="text-white/30">SESSION ID</span>
-                          <span className="text-white/70 break-all">{reportData.session_id}</span>
-                        </div>
                         <div className="flex justify-between font-mono text-[10px]">
                           <span className="text-white/30">VALIDATOR</span>
                           <span className="text-white/70">GPT-4O CORE</span>

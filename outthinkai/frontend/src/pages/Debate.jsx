@@ -330,10 +330,6 @@ export default function Debate() {
               </p>
             </div>
             
-            <div className="hidden md:flex flex-col items-end">
-               <span className="font-mono text-[10px] text-white/40 uppercase mb-1">Session ID</span>
-               <span className="font-mono text-[12px] text-white/80">{sessionId ? `${sessionId.slice(0, 8)}...` : "NONE"}</span>
-            </div>
           </div>
 
           {/* Main Content Area */}
