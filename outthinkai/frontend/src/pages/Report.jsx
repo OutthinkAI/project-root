@@ -142,10 +142,10 @@ function TurnDetailModal({ fallacy, messages, onClose }) {
 
 // ---- 통계 그리드 ----
 function StatsGrid({ score, fallacyCount }) {
-  const grade = score >= 90 ? "A+" : score >= 80 ? "A" : score >= 70 ? "B" : "C";
+  const grade = score >= 80 ? "A+" : score >= 60 ? "A" : score >= 40 ? "B" : "C";
   const gradeColor =
     score >= 80 ? "text-emerald-600 dark:text-emerald-400"
-    : score >= 70 ? "text-blue-600 dark:text-blue-400"
+    : score >= 60 ? "text-blue-600 dark:text-blue-400"
     : "text-orange-600 dark:text-orange-400";
 
   const stats = [

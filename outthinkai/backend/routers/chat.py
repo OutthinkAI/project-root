@@ -231,13 +231,6 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
         try:
             res = await db.execute(text("SELECT * FROM sessions WHERE id = :sid"), {"sid": str(session_id)})
             session = res.mappings().one()
-            
-            res_h = await db.execute(
-                text("SELECT role, content FROM messages WHERE session_id = :sid ORDER BY turn_number DESC LIMIT 10"),
-                {"sid": str(session_id)}
-            )
-            history_rows = res_h.mappings().all()
-            history_str = "\n".join([f"{r['role']}: {r['content']}" for r in reversed(history_rows)])
 
             # 루프 도중 turn_number 관리를 위해 현재 값 가져오기
             current_turn = session["turn_count"]
@@ -246,23 +239,42 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
             for agent_key in targets:
                 agent_data = session[agent_key]
                 current_turn += 1 # 각 에이전트 응답마다 턴 증가
-                
+
+                # 에이전트별로 최신 히스토리를 매번 재조회 (agent_a 응답 후 agent_b가 그 내용을 반영)
+                other_key = "agent_b" if agent_key == "agent_a" else "agent_a"
+                res_h = await db.execute(
+                    text("SELECT role, content FROM messages WHERE session_id = :sid ORDER BY turn_number ASC, created_at ASC"),
+                    {"sid": str(session_id)}
+                )
+                history_rows = res_h.mappings().all()
+
+                own_lines = [f"- {r['content']}" for r in history_rows if r["role"] == agent_key]
+                opponent_lines = [f"- {r['content']}" for r in history_rows if r["role"] == other_key]
+                own_history = "\n".join(own_lines) if own_lines else "(없음)"
+                opponent_history = "\n".join(opponent_lines) if opponent_lines else "(없음)"
+
+                initial_stance = agent_data.get("initial_claim") or agent_data.get("persona", "")
+
                 response_stream = await client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
                         {"role": "system", "content": AGENT_SYSTEM_PROMPT.format(
                             persona=agent_data["persona"],
+                            agent_key=agent_key,
                             fallacy_type=agent_data["fallacy_type"],
+                            initial_stance=initial_stance,
                             topic=session["topic"],
                             scenario=session["scenario"]
                         )},
                         {"role": "user", "content": AGENT_USER_PROMPT.format(
-                            history=history_str,
+                            agent_key=agent_key,
+                            own_history=own_history,
+                            opponent_history=opponent_history,
                             message=user_message
                         )}
                     ],
                     stream=True,
-                    temperature=0.7
+                    temperature=0.4
                 )
 
                 full_content = ""
