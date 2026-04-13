@@ -50,13 +50,13 @@ export default function Home() {
   };
 
   return (
-    <div className="relative flex min-h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#00ffaa]/30 font-sans">
+    <div className="relative flex h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#00ffaa]/30 font-sans">
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none"
         style={{ backgroundImage: "linear-gradient(rgba(0,255,170,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,170,0.3) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="relative flex-1 flex flex-col min-w-0 overflow-auto z-10">
+      <main className="relative flex-1 flex flex-col h-full min-w-0 overflow-auto z-10">
         <div className="flex flex-col gap-10 p-6 md:p-12 max-w-[1200px] mx-auto w-full">
 
           {/* Header */}
