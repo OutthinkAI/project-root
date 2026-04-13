@@ -1,8 +1,8 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useDarkMode } from "../App";
 
-const navItems = [
+const NAV_ITEMS = [
   {
     label: "미션 센터",
     href: "/",
@@ -53,6 +53,14 @@ function MoonIcon() {
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
+  const { sessionId } = useParams();
+
+  const navItems = NAV_ITEMS.map((item) => {
+    if (item.href === "/debate" && sessionId) {
+      return { ...item, href: `/debate/${sessionId}` };
+    }
+    return item;
+  });
   const { dark, toggle } = useDarkMode();
 
   return (
