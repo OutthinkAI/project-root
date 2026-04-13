@@ -49,7 +49,7 @@ export default function Debate() {
   const [searchParams] = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const disconnectRef = useRef(null);
-  const messagesEndRef = useRef(null); // 스크롤용
+  const messagesEndRef = useRef(null);
 
   const latestRef = useRef({
     scenario: null,
@@ -58,7 +58,6 @@ export default function Debate() {
     messages: [],
   });
 
-  // 경로 파라미터나 쿼리 스트링 모두에서 sessionId를 가져옵니다.
   const sessionId = pathId || searchParams.get("sessionId") || "";
 
   const [scenario, setScenario] = useState(null);
@@ -74,7 +73,6 @@ export default function Debate() {
 
   const orderedMessages = useMemo(() => sortMessages(messages), [messages]);
 
-  // 에이전트 초기 클레임 (DB에 저장되지 않으므로 scenario에서 직접 표시)
   const initialClaims = useMemo(() => {
     if (!scenario) return [];
     return [
@@ -99,13 +97,11 @@ export default function Debate() {
     ].filter(Boolean);
   }, [scenario]);
 
-  // 실제 에이전트 이름 (ChatBubble에 전달)
   const agentNames = useMemo(() => ({
     agent_a: scenario?.agent_a?.name || "Agent Alpha",
     agent_b: scenario?.agent_b?.name || "Agent Bravo",
   }), [scenario]);
 
-  // 자동 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [orderedMessages, drafts]);
@@ -139,7 +135,7 @@ export default function Debate() {
         setMessages(historyData?.messages || []);
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError.message || "Failed to load debate session.");
+          setError(loadError.message || "세션을 불러오지 못했습니다.");
         }
       } finally {
         if (!cancelled) {
@@ -266,7 +262,7 @@ export default function Debate() {
       onError: () => {
         disconnectStream();
         setSending(false);
-        setError("The live stream ended unexpectedly.");
+        setError("스트림 연결이 예기치 않게 종료되었습니다.");
       },
     });
   }
@@ -299,80 +295,92 @@ export default function Debate() {
       setMessages((current) =>
         current.filter((message) => message.id !== optimisticMessage.id),
       );
-      setError(sendError.message || "Failed to send message.");
+      setError(sendError.message || "메시지 전송에 실패했습니다.");
     }
   }
 
   return (
-    // 1. min-h-screen을 h-screen으로 변경하여 브라우저 높이에 딱 맞게 고정합니다.
-    <div className="relative flex h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#00ffaa]/30 font-sans">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* 2. main 영역도 h-full과 overflow-hidden을 추가해 내부 요소가 밖으로 나가지 않게 합니다. */}
-      <main className="relative flex-1 flex flex-col h-full min-w-0 overflow-hidden z-10">
-        {/* 3. 내부 컨테이너도 h-full로 채우고 overflow-hidden을 줍니다. */}
-        <div className="flex flex-col gap-6 p-6 md:p-12 max-w-[1400px] mx-auto w-full h-full overflow-hidden">
-          
-          {/* Header Section: flex-shrink-0을 넣어 높이가 줄어들지 않게 고정합니다. */}
-          <div className="flex justify-between items-end border-b border-white/10 pb-6 flex-shrink-0">
-            <div className="flex flex-col gap-2">
+      <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        <div className="flex flex-col h-full max-w-[1400px] mx-auto w-full">
+
+          {/* 헤더 */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 ${sessionId ? (streaming ? "bg-[#00ffaa] animate-pulse" : "bg-white/20") : "bg-[#ff00aa]"}`} />
-                <span className="font-mono text-[10px] text-[#00ffaa] tracking-[2px] uppercase">
-                  {!sessionId ? "Offline" : session?.status || (loading ? "Initializing" : "Idle")}
+                <span className={`w-2 h-2 rounded-full ${
+                  !sessionId ? "bg-gray-400"
+                  : streaming ? "bg-emerald-500 animate-pulse"
+                  : session?.status === "completed" ? "bg-gray-400"
+                  : "bg-emerald-500"
+                }`} />
+                <span className="text-[13px] text-gray-500 dark:text-gray-400">
+                  {!sessionId ? "세션 없음"
+                    : session?.status === "completed" ? "완료"
+                    : streaming ? "AI 응답 중"
+                    : loading ? "로딩 중"
+                    : "진행 중"}
                 </span>
               </div>
-              <h1 className="font-grotesk text-[32px] md:text-[40px] font-bold leading-none tracking-tight">
-                {!sessionId ? "No Active Session" : session?.topic || scenario?.topic || "Debate Session"}
+              <span className="text-gray-300 dark:text-gray-700">|</span>
+              <h1 className="text-[15px] font-semibold text-gray-900 dark:text-white truncate max-w-[300px]">
+                {!sessionId ? "세션 없음" : session?.topic || scenario?.topic || "토론 세션"}
               </h1>
-              <p className="font-mono text-[14px] text-white/40">
-                {sessionId ? "> 시스템 논리 허점을 공략하십시오_" : "> 진행 중인 시뮬레이션이 없습니다_"}
-              </p>
             </div>
-            
           </div>
 
-          {/* Main Content Area */}
+          {/* 컨텐츠 */}
           {!sessionId ? (
-            <div className="flex-1 border border-white/10 bg-black/40 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-              {/* ... (기존 세션 없음 UI 유지) ... */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#ff00aa]/50 to-transparent opacity-50" />
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ff00aa" strokeWidth="1" className="mb-6 opacity-80">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <h2 className="font-grotesk text-[24px] font-bold text-white mb-2 uppercase tracking-widest">
-                Session Not Found
-              </h2>
-              <p className="font-mono text-[14px] text-white/50 mb-8 max-w-md leading-relaxed">
-                현재 활성화된 삼각 토론 세션이 없습니다.<br/>
-                미션 센터로 돌아가 새로운 분석 시나리오를 가동하십시오.
-              </p>
-              <button
-                onClick={() => navigate("/")}
-                className="px-8 py-4 bg-white/5 border border-white/20 text-white font-mono text-[12px] font-bold uppercase tracking-wider hover:bg-[#00ffaa] hover:text-black hover:border-[#00ffaa] transition-all shadow-[0_0_15px_rgba(0,255,170,0)] hover:shadow-[0_0_20px_rgba(0,255,170,0.3)]"
-              >
-                미션 센터로 귀환 →
-              </button>
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
+                <h2 className="text-[18px] font-semibold text-gray-900 dark:text-white mb-2">활성 세션 없음</h2>
+                <p className="text-[14px] text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">
+                  현재 활성화된 토론 세션이 없습니다.<br/>미션 센터에서 새 시나리오를 시작해주세요.
+                </p>
+                <button
+                  onClick={() => navigate("/")}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-[14px] rounded-lg transition-colors"
+                >
+                  미션 센터로 이동
+                </button>
+              </div>
             </div>
           ) : (
-            // 4. grid 영역에 flex-1과 min-h-0을 주어 부모 높이를 넘어가지 않게 합니다.
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 overflow-hidden">
-              
-              {/* 좌측 채팅 영역: flex-col과 overflow-hidden으로 내부 스크롤 준비를 합니다. */}
-              <div className="lg:col-span-8 flex flex-col border border-white/10 bg-black/40 overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-2 pointer-events-none opacity-20">
-                    <span className="font-mono text-[10px] tracking-widest uppercase">ENCRYPTED_CHANNEL</span>
-                </div>
-                
-                {/* 5. 핵심: flex-1과 overflow-y-auto를 통해 채팅 리스트만 스크롤되게 만듭니다. */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-2 scrollbar-cyber">
-                  {loading && <p className="font-mono text-[12px] text-white/40 italic text-center py-10">Loading debate records...</p>}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-0 overflow-hidden">
+
+              {/* 채팅 영역 */}
+              <div className="lg:col-span-8 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+                {/* 메시지 목록 */}
+                <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-0 scrollbar-custom">
+                  {loading && (
+                    <p className="text-[13px] text-gray-400 italic text-center py-12">세션 데이터 불러오는 중...</p>
+                  )}
                   {!loading && orderedMessages.length === 0 && !error && (
-                    <p className="font-mono text-[12px] text-[#00ffaa] italic text-center py-10 opacity-70 animate-pulse">
-                      시스템 준비 완료. 첫 번째 반박을 전송하여 논리 검증 엔진을 가동하십시오.
-                    </p>
+                    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                      <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                      </div>
+                      <p className="text-[14px] text-gray-500 dark:text-gray-400">
+                        AI 에이전트의 주장을 읽고 첫 번째 반박을 입력해보세요.
+                      </p>
+                    </div>
                   )}
 
                   {[...initialClaims, ...orderedMessages].map((message) => (
@@ -392,76 +400,84 @@ export default function Debate() {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* 에러 배너 */}
+                {error && (
+                  <div className="mx-4 mb-2 px-4 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-[13px] text-center">
+                    {error}
+                  </div>
+                )}
+
+                {/* 입력창 */}
                 <form
                   onSubmit={handleSend}
-                  className="flex border-t border-white/10 bg-black p-4 md:p-6 gap-4 flex-shrink-0"
+                  className="border-t border-gray-200 dark:border-gray-800 p-4 flex gap-3 flex-shrink-0 bg-white dark:bg-gray-900"
                 >
                   <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="논리 오류를 짚고 반박을 입력하세요."
+                    placeholder={session?.status === "completed" ? "토론이 종료되었습니다." : "논리 오류를 지적하고 반박을 입력하세요..."}
                     disabled={!sessionId || sending || session?.status === "completed"}
-                    className="flex-1 bg-white/[0.03] border border-white/10 px-5 py-4 text-white font-sans text-[14px] outline-none focus:border-[#00ffaa] transition-colors placeholder:text-white/20 disabled:opacity-50"
+                    className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-[14px] text-gray-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder:text-gray-400 dark:placeholder:text-gray-600 disabled:opacity-50"
                   />
                   <button
                     type="submit"
                     disabled={!sessionId || sending || session?.status === "completed"}
-                    className="px-8 bg-[#00ffaa] text-black font-mono text-[14px] font-bold uppercase hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl transition-colors flex-shrink-0"
                   >
-                    {sending ? "..." : "Send"}
+                    {sending ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                      </svg>
+                    ) : "전송"}
                   </button>
                 </form>
-                
-                {error && (
-                  <div className="absolute bottom-24 left-0 right-0 px-6 py-2 bg-[#ff00aa]/20 border-y border-[#ff00aa]/50 text-[#ff00aa] font-mono text-[11px] text-center backdrop-blur-md z-20">
-                    {error}
+              </div>
+
+              {/* 우측 정보 패널 */}
+              <div className="lg:col-span-4 flex flex-col gap-4 overflow-y-auto p-4 scrollbar-custom bg-gray-50 dark:bg-gray-950 min-h-0">
+                {/* 시나리오 */}
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm p-5">
+                  <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">시나리오</p>
+                  <p className="text-[13px] text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                    {scenario?.scenario || "시나리오 데이터 불러오는 중..."}
+                  </p>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-[12px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-violet-500" />
+                        <span className="text-gray-500 dark:text-gray-400">Alpha</span>
+                      </span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{scenario?.agent_a?.name || "-"}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[12px]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-orange-500" />
+                        <span className="text-gray-500 dark:text-gray-400">Bravo</span>
+                      </span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{scenario?.agent_b?.name || "-"}</span>
+                    </div>
                   </div>
+                </div>
+
+                {/* 점수 패널 */}
+                <ScorePanel
+                  totalScore={session?.total_score || 0}
+                  validator={validator}
+                  sessionStatus={session?.status}
+                />
+
+                {/* 세션 완료 → 리포트 버튼 */}
+                {session?.status === "completed" && (
+                  <button
+                    onClick={() => navigate(`/report/${sessionId}`)}
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[14px] rounded-xl transition-colors"
+                  >
+                    리포트 보기 →
+                  </button>
                 )}
               </div>
-
-              {/* 우측 정보 패널 영역 */}
-              <div className="lg:col-span-4 flex flex-col gap-4 overflow-y-auto scrollbar-cyber min-h-0">
-                  <div className="p-5 border border-white/10 bg-white/[0.02]">
-                      <h3 className="font-mono text-[10px] text-white/40 uppercase tracking-[2px] mb-4">
-                        Scenario Brief
-                      </h3>
-                      <p className="font-sans text-[13px] text-white/80 leading-relaxed whitespace-pre-wrap">
-                        {scenario?.scenario || "시나리오 데이터를 불러오는 중입니다..."}
-                      </p>
-                      
-                      <div className="mt-6 flex flex-col gap-3">
-                        <div className="flex justify-between font-mono text-[11px] border-b border-white/5 pb-2">
-                            <span className="text-white/40">Agent Alpha</span>
-                            <span className="text-[#00ffaa] text-right">{scenario?.agent_a?.name || "-"}</span>
-                        </div>
-                        <div className="flex justify-between font-mono text-[11px] border-b border-white/5 pb-2">
-                            <span className="text-white/40">Agent Bravo</span>
-                            <span className="text-[#ff00aa] text-right">{scenario?.agent_b?.name || "-"}</span>
-                        </div>
-                      </div>
-                  </div>
-
-                  <ScorePanel
-                    totalScore={session?.total_score || 0}
-                    validator={validator}
-                    sessionStatus={session?.status}
-                  />
-
-                  {session?.status === "completed" && (
-                    <div className="p-4 border border-[#00ffaa]/30 bg-[#00ffaa]/5 backdrop-blur-md">
-                      <button
-                        onClick={() => navigate(`/report/${sessionId}`)}
-                        className="w-full py-4 bg-[#00ffaa] text-black font-mono text-[13px] font-bold uppercase hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,170,0.4)] transition-all"
-                      >
-                        View Final Report →
-                      </button>
-                    </div>
-                  )}
-              </div>
-
             </div>
           )}
-
         </div>
       </main>
     </div>
