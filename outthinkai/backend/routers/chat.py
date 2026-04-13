@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 MAX_USER_TURNS = 5  # 사용자가 5번 메시지를 보내면 세션 종료
+MAX_VALIDATOR_SCORE = 40
+MAX_TURN_SCORE = 100 // MAX_USER_TURNS
 
 # SSE Subscriber storage: session_id -> Set of asyncio.Queues
 SESSION_SUBSCRIBERS: Dict[UUID, List[asyncio.Queue]] = {}
@@ -48,6 +50,58 @@ async def push_event(session_id: UUID, event_type: str, data: Any):
         # 현재 연결된 모든 클라이언트 큐에 푸시
         for queue in SESSION_SUBSCRIBERS[session_id]:
             await queue.put(event)
+
+def calculate_turn_score(validation_results: List[Any]) -> int:
+    if not validation_results:
+        return 0
+
+    average_score = sum(result.score_delta for result in validation_results) / len(validation_results)
+    scaled_score = round(average_score * (MAX_TURN_SCORE / MAX_VALIDATOR_SCORE))
+    return max(0, min(MAX_TURN_SCORE, scaled_score))
+
+def build_score_breakdown(val_result: Any) -> dict:
+    score = max(0, min(MAX_VALIDATOR_SCORE, val_result.score_delta or 0))
+    if not val_result.is_valid_rebuttal:
+        return {
+            "fallacy_identification": 0,
+            "evidence_quality": 0,
+            "terminology_accuracy": 0,
+            "speed_bonus": 0,
+        }
+
+    fallacy = min(16, round(score * 0.4)) if val_result.fallacy_addressed else 0
+    evidence = min(12, round(score * 0.3))
+    terms = min(8, round(score * 0.2))
+    speed = min(4, max(0, score - fallacy - evidence - terms))
+
+    return {
+        "fallacy_identification": fallacy,
+        "evidence_quality": evidence,
+        "terminology_accuracy": terms,
+        "speed_bonus": speed,
+    }
+
+def calculate_turn_score_breakdown(validation_results: List[Any]) -> dict:
+    empty = {
+        "fallacy_identification": 0,
+        "evidence_quality": 0,
+        "terminology_accuracy": 0,
+        "speed_bonus": 0,
+    }
+    if not validation_results:
+        return empty
+
+    averaged = {}
+    for key in empty:
+        averaged[key] = sum(build_score_breakdown(result)[key] for result in validation_results) / len(validation_results)
+
+    scale = MAX_TURN_SCORE / MAX_VALIDATOR_SCORE
+    scaled = {key: max(0, round(value * scale)) for key, value in averaged.items()}
+    target_total = calculate_turn_score(validation_results)
+    diff = target_total - sum(scaled.values())
+    if diff:
+        scaled["evidence_quality"] = max(0, scaled["evidence_quality"] + diff)
+    return scaled
 
 @router.post("/message", response_model=ChatMessageResponse)
 async def post_message(
@@ -187,6 +241,7 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
 
             # 루프 도중 turn_number 관리를 위해 현재 값 가져오기
             current_turn = session["turn_count"]
+            validation_results = []
 
             for agent_key in targets:
                 agent_data = session[agent_key]
@@ -249,27 +304,44 @@ async def process_agent_responses(session_id: UUID, targets: List[str], user_mes
                     user_message=user_message,
                     last_3_turns=history_str,
                 )
+                validation_results.append(val_result)
 
                 await db.execute(
                     text("UPDATE messages SET score_delta = :sd, feedback = :fb WHERE id = :mid"),
                     {"sd": val_result.score_delta, "fb": val_result.feedback, "mid": msg_id}
                 )
-                # 세션 토탈 점수 업데이트 로직 (update_session_after_message 활용)
-                await db.execute(
-                    text("UPDATE sessions SET total_score = total_score + :delta WHERE id = :sid"),
-                    {"delta": val_result.score_delta, "sid": str(session_id)}
-                )
                 await db.commit()
+
+                surrendered = await detect_surrender(full_content, client)
+                is_last_target = agent_key == targets[-1] or surrendered
+                turn_score_delta = calculate_turn_score(validation_results) if is_last_target else 0
+                total_score_res = await db.execute(
+                    text("SELECT total_score FROM sessions WHERE id = :sid"),
+                    {"sid": str(session_id)}
+                )
+                total_score = total_score_res.scalar() or 0
+
+                if turn_score_delta:
+                    total_score = min(100, total_score + turn_score_delta)
+                    await db.execute(
+                        text("UPDATE sessions SET total_score = :total_score WHERE id = :sid"),
+                        {"total_score": total_score, "sid": str(session_id)}
+                    )
+                    await db.commit()
 
                 await push_event(session_id, "validator_result", {
                     "agent": agent_key,
                     "score_delta": val_result.score_delta,
+                    "score_breakdown": build_score_breakdown(val_result),
+                    "turn_score_delta": turn_score_delta,
+                    "turn_score_breakdown": calculate_turn_score_breakdown(validation_results) if is_last_target else None,
+                    "total_score": total_score,
                     "feedback": val_result.feedback,
                     "is_valid_rebuttal": val_result.is_valid_rebuttal,
                     "fallacy_addressed": val_result.fallacy_addressed
                 })
 
-                if await detect_surrender(full_content, client):
+                if surrendered:
                     await handle_surrender(session_id, agent_key)
                     return  # 항복 처리 후 종료
 
