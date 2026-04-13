@@ -416,12 +416,12 @@ export default function Debate() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={session?.status === "completed" ? "토론이 종료되었습니다." : "논리 오류를 지적하고 반박을 입력하세요..."}
-                    disabled={!sessionId || sending || session?.status === "completed"}
+                    disabled={!sessionId || sending || streaming || session?.status === "completed"}
                     className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-[14px] text-gray-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder:text-gray-400 dark:placeholder:text-gray-600 disabled:opacity-50"
                   />
                   <button
                     type="submit"
-                    disabled={!sessionId || sending || session?.status === "completed"}
+                    disabled={!sessionId || sending || streaming || session?.status === "completed"}
                     className="px-5 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl transition-colors flex-shrink-0"
                   >
                     {sending ? (

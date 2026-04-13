@@ -178,10 +178,10 @@ export default function Report() {
   }, [sessionId]);
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-auto">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center p-8">
