@@ -41,10 +41,10 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-auto">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <div className="flex flex-col gap-8 p-6 md:p-10 max-w-[900px] mx-auto w-full">
 
           {/* 모바일 사이드바 열기 버튼 */}

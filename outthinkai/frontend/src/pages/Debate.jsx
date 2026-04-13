@@ -12,6 +12,21 @@ import {
 } from "../api/client";
 
 const REPORT_STORAGE_PREFIX = "outthink-report:";
+const EMPTY_BREAKDOWN = {
+  fallacy_identification: 0,
+  evidence_quality: 0,
+  terminology_accuracy: 0,
+  speed_bonus: 0,
+};
+
+function addBreakdowns(left, right) {
+  return Object.fromEntries(
+    Object.keys(EMPTY_BREAKDOWN).map((key) => [
+      key,
+      (left?.[key] || 0) + (right?.[key] || 0),
+    ]),
+  );
+}
 
 // ---- 헬퍼 함수들 ----
 function sortMessages(messages) {
@@ -50,6 +65,7 @@ export default function Debate() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const disconnectRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const pendingAgentsRef = useRef(new Set());
 
   const latestRef = useRef({
     scenario: null,
@@ -65,10 +81,11 @@ export default function Debate() {
   const [messages, setMessages] = useState([]);
   const [drafts, setDrafts] = useState({ agent_a: "", agent_b: "" });
   const [validator, setValidator] = useState(null);
+  const [cumulativeBreakdown, setCumulativeBreakdown] = useState(EMPTY_BREAKDOWN);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [responseLocked, setResponseLocked] = useState(false);
   const [error, setError] = useState("");
 
   const orderedMessages = useMemo(() => sortMessages(messages), [messages]);
@@ -133,6 +150,13 @@ export default function Debate() {
         setScenario(scenarioData);
         setSession(sessionData);
         setMessages(historyData?.messages || []);
+        setCumulativeBreakdown(EMPTY_BREAKDOWN);
+        // 활성 세션 ID 저장 (다른 페이지에서도 링크 유지)
+        if (sessionData?.status === "completed") {
+          localStorage.removeItem("outthink-active-session");
+        } else {
+          localStorage.setItem("outthink-active-session", sessionId);
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError.message || "세션을 불러오지 못했습니다.");
@@ -160,13 +184,21 @@ export default function Debate() {
     setStreaming(false);
   }
 
+  function clearResponseLock() {
+    pendingAgentsRef.current = new Set();
+    setResponseLocked(false);
+    setStreaming(false);
+  }
+
   function handleSessionComplete(payload) {
     disconnectStream();
-    setSending(false);
+    clearResponseLock();
     setDrafts({ agent_a: "", agent_b: "" });
     setSession((current) =>
       current ? { ...current, status: "completed" } : { status: "completed" },
     );
+    // 세션 완료 시 활성 세션 ID 삭제
+    localStorage.removeItem("outthink-active-session");
 
     persistReport(sessionId, {
       scenario: latestRef.current.scenario,
@@ -215,8 +247,15 @@ export default function Debate() {
       },
       onValidatorResult: (payload) => {
         setValidator(payload);
-        setSending(false);
-        setStreaming(false);
+        if (payload.turn_score_breakdown) {
+          setCumulativeBreakdown((current) => addBreakdowns(current, payload.turn_score_breakdown));
+        }
+        if (payload.agent) {
+          pendingAgentsRef.current.delete(payload.agent);
+        }
+        const stillProcessing = pendingAgentsRef.current.size > 0;
+        setResponseLocked(stillProcessing);
+        setStreaming(stillProcessing);
         setSession((current) => {
           const nextTurnCount = Math.max(
             current?.turn_count || 0,
@@ -241,6 +280,7 @@ export default function Debate() {
         });
       },
       onSurrenderDetected: (payload) => {
+        clearResponseLock();
         setMessages((current) => [
           ...current,
           {
@@ -261,7 +301,7 @@ export default function Debate() {
       },
       onError: () => {
         disconnectStream();
-        setSending(false);
+        clearResponseLock();
         setError("스트림 연결이 예기치 않게 종료되었습니다.");
       },
     });
@@ -271,14 +311,14 @@ export default function Debate() {
     event.preventDefault();
 
     const content = input.trim();
-    if (!content || !sessionId || sending || session?.status === "completed") {
+    if (!content || !sessionId || responseLocked || session?.status === "completed") {
       return;
     }
 
     const optimisticMessage = buildUserMessage(content, (session?.turn_count || 0) + 1);
 
     setError("");
-    setSending(true);
+    setResponseLocked(true);
     setInput("");
     setMessages((current) => [...current, optimisticMessage]);
 
@@ -289,15 +329,27 @@ export default function Debate() {
           message.id === optimisticMessage.id ? response?.message || optimisticMessage : message,
         ),
       );
+      const targetAgents = (response?.target_agents || [])
+        .map((agent) => (typeof agent === "string" ? agent : agent?.value))
+        .filter(Boolean);
+      pendingAgentsRef.current = new Set(targetAgents.length > 0 ? targetAgents : ["agent_a", "agent_b"]);
+
+      if (pendingAgentsRef.current.size === 0) {
+        clearResponseLock();
+        return;
+      }
+
       startStream(sessionId);
     } catch (sendError) {
-      setSending(false);
+      clearResponseLock();
       setMessages((current) =>
         current.filter((message) => message.id !== optimisticMessage.id),
       );
       setError(sendError.message || "메시지 전송에 실패했습니다.");
     }
   }
+
+  const inputDisabled = !sessionId || loading || responseLocked || session?.status === "completed";
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
@@ -416,15 +468,15 @@ export default function Debate() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={session?.status === "completed" ? "토론이 종료되었습니다." : "논리 오류를 지적하고 반박을 입력하세요..."}
-                    disabled={!sessionId || sending || streaming || session?.status === "completed"}
+                    disabled={inputDisabled}
                     className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-[14px] text-gray-900 dark:text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder:text-gray-400 dark:placeholder:text-gray-600 disabled:opacity-50"
                   />
                   <button
                     type="submit"
-                    disabled={!sessionId || sending || streaming || session?.status === "completed"}
+                    disabled={inputDisabled}
                     className="px-5 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-[14px] rounded-xl transition-colors flex-shrink-0"
                   >
-                    {sending ? (
+                    {responseLocked ? (
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
                         <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                       </svg>
@@ -463,6 +515,7 @@ export default function Debate() {
                 <ScorePanel
                   totalScore={session?.total_score || 0}
                   validator={validator}
+                  cumulativeBreakdown={cumulativeBreakdown}
                   sessionStatus={session?.status}
                 />
 

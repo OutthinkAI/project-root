@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
-import { getReport, generateReport } from "../api/client";
+import { getReport, generateReport, getChatHistory } from "../api/client";
 import Sidebar from "../components/Sidebar";
 
 const FALLACY_KO = {
@@ -25,6 +25,119 @@ const QUALITY_STYLE = {
 
 function fallacyLabel(type) {
   return FALLACY_KO[type] || (type || "").replace(/_/g, " ");
+}
+
+// 백엔드와 동일한 공식으로 turn_score 계산
+// MAX_TURN_SCORE=20, MAX_VALIDATOR_SCORE=40 → ratio=0.5
+const MAX_TURN_SCORE = 20;
+const MAX_VALIDATOR_SCORE = 40;
+
+function calcTurnScore(agentMsgs) {
+  const scores = agentMsgs.map((m) => m.score_delta || 0).filter((s) => s > 0);
+  if (scores.length === 0) return 0;
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return Math.max(0, Math.min(MAX_TURN_SCORE, Math.round(avg * (MAX_TURN_SCORE / MAX_VALIDATOR_SCORE))));
+}
+
+// ---- 턴 상세 모달 ----
+function TurnDetailModal({ fallacy, messages, onClose }) {
+  if (!fallacy) return null;
+
+  // 해당 턴의 유저 메시지 (유저 메시지 중 N번째)
+  const userMessages = messages
+    .filter((m) => m.role === "user")
+    .sort((a, b) => (a.turn_number || 0) - (b.turn_number || 0));
+  const userMsg = userMessages[fallacy.turn - 1];
+
+  // 해당 턴 이후 에이전트 메시지
+  const agentMsgs = messages.filter(
+    (m) =>
+      m.role !== "user" &&
+      m.turn_number > (userMsg?.turn_number ?? 0),
+  ).sort((a, b) => (a.turn_number || 0) - (b.turn_number || 0));
+
+  // 다음 유저 메시지 이전까지만
+  const nextUserTurn = userMessages[fallacy.turn]?.turn_number ?? Infinity;
+  const relevantAgentMsgs = agentMsgs.filter((m) => m.turn_number < nextUserTurn);
+
+  // 백엔드와 동일한 공식으로 PoT 기여 점수 계산
+  const turnScore = calcTurnScore(relevantAgentMsgs);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-full bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 flex items-center justify-center text-[12px] font-bold flex-shrink-0">
+              {fallacy.turn}
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-gray-900 dark:text-white">{fallacyLabel(fallacy.fallacy_type)}</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">{fallacy.turn}번째 턴 · {QUALITY_KO[fallacy.quality] || fallacy.quality}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+          {/* 내 답변 */}
+          <div>
+            <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">내 답변</p>
+            {userMsg ? (
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-xl">
+                <p className="text-[14px] text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap">{userMsg.content}</p>
+              </div>
+            ) : (
+              <p className="text-[13px] text-gray-400 italic">답변 데이터를 찾을 수 없습니다.</p>
+            )}
+          </div>
+
+          {/* 점수 */}
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-gray-500 dark:text-gray-400">PoT 기여 점수</span>
+            <span className={`px-2.5 py-1 rounded-full text-[12px] font-semibold ${
+              turnScore > 0
+                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500"
+            }`}>
+              {turnScore > 0 ? `+${turnScore}점` : "0점"}
+            </span>
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">/ {MAX_TURN_SCORE}점</span>
+          </div>
+
+          {/* AI 피드백 */}
+          {relevantAgentMsgs.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">AI 평가</p>
+              <div className="flex flex-col gap-2">
+                {relevantAgentMsgs.map((m, i) => (
+                  m.feedback && (
+                    <div key={i} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700">
+                      <p className="text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed italic">{m.feedback}</p>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---- 통계 그리드 ----
@@ -56,28 +169,37 @@ function StatsGrid({ score, fallacyCount }) {
 }
 
 // ---- 오류 탐지 로그 ----
-function FallacyLog({ fallacies }) {
+function FallacyLog({ fallacies, onSelect }) {
   if (!fallacies || fallacies.length === 0) return null;
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
         <h3 className="text-[13px] font-semibold text-gray-900 dark:text-white">탐지된 논리 오류</h3>
-        <span className="text-[12px] text-gray-400 dark:text-gray-500">총 {fallacies.length}건</span>
+        <span className="text-[12px] text-gray-400 dark:text-gray-500">총 {fallacies.length}건 · 클릭해서 상세 보기</span>
       </div>
       <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
         {fallacies.map((f, i) => (
-          <div key={i} className="flex items-center gap-4 px-5 py-4">
+          <button
+            key={i}
+            onClick={() => onSelect(f)}
+            className="flex items-center gap-4 px-5 py-4 w-full text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors group"
+          >
             <div className="w-8 h-8 rounded-full bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 flex-shrink-0 flex items-center justify-center text-[12px] font-bold">
               {f.turn}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-medium text-gray-900 dark:text-white">{fallacyLabel(f.fallacy_type)}</p>
+              <p className="text-[14px] font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{fallacyLabel(f.fallacy_type)}</p>
               <p className="text-[12px] text-gray-400 dark:text-gray-500">{f.turn}번째 턴에서 탐지</p>
             </div>
-            <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${QUALITY_STYLE[f.quality] || "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
-              {QUALITY_KO[f.quality] || f.quality}
-            </span>
-          </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${QUALITY_STYLE[f.quality] || "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
+                {QUALITY_KO[f.quality] || f.quality}
+              </span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300 dark:text-gray-600 group-hover:text-blue-400 transition-colors">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </div>
+          </button>
         ))}
       </div>
     </div>
@@ -129,9 +251,11 @@ export default function Report() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reportData, setReportData] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorInfo, setErrorInfo] = useState({ type: null, msg: "" });
   const [certOpen, setCertOpen] = useState(false);
+  const [selectedFallacy, setSelectedFallacy] = useState(null);
 
   const sessionId = pathId || searchParams.get("sessionId") || "";
 
@@ -147,9 +271,13 @@ export default function Report() {
 
       for (let attempt = 0; attempt < 10; attempt++) {
         try {
-          const data = await getReport(sessionId);
+          const [reportResult, historyResult] = await Promise.all([
+            getReport(sessionId),
+            getChatHistory(sessionId).catch(() => ({ messages: [] })),
+          ]);
           if (isMounted) {
-            setReportData(data);
+            setReportData(reportResult);
+            setChatMessages(historyResult?.messages || []);
             setTimeout(() => setLoading(false), 1200);
           }
           return;
@@ -176,6 +304,13 @@ export default function Report() {
     load();
     return () => { isMounted = false; };
   }, [sessionId]);
+
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") setSelectedFallacy(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-white overflow-hidden">
@@ -259,7 +394,10 @@ export default function Report() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-7 flex flex-col gap-6">
                 {/* 오류 탐지 로그 */}
-                <FallacyLog fallacies={reportData.fallacies_caught} />
+                <FallacyLog
+                  fallacies={reportData.fallacies_caught}
+                  onSelect={setSelectedFallacy}
+                />
 
                 {/* 강점 / 개선점 */}
                 <CritiqueSection strengths={reportData.strengths} improvements={reportData.improvements} />
@@ -335,6 +473,15 @@ export default function Report() {
           </div>
         )}
       </main>
+
+      {/* 턴 상세 모달 */}
+      {selectedFallacy && (
+        <TurnDetailModal
+          fallacy={selectedFallacy}
+          messages={chatMessages}
+          onClose={() => setSelectedFallacy(null)}
+        />
+      )}
     </div>
   );
 }
