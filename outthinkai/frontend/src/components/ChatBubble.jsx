@@ -74,8 +74,8 @@ export default function ChatBubble({
           {content || (isStreaming ? "..." : "")}
         </div>
 
-        {/* 점수/피드백 */}
-        {((typeof scoreDelta === "number" && scoreDelta > 0) || feedback) && (
+        {/* 점수/피드백 — 유저 메시지에만 표시 */}
+        {isUser && ((typeof scoreDelta === "number" && scoreDelta > 0) || feedback) && (
           <div className="flex items-start gap-2 mt-1 px-1">
             {typeof scoreDelta === "number" && scoreDelta > 0 && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold">

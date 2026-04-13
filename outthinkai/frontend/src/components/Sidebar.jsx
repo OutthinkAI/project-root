@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useDarkMode } from "../App";
 
 const NAV_ITEMS = [
@@ -53,15 +53,28 @@ function MoonIcon() {
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
-  const { sessionId } = useParams();
-
-  const navItems = NAV_ITEMS.map((item) => {
-    if (item.href === "/debate" && sessionId) {
-      return { ...item, href: `/debate/${sessionId}` };
-    }
-    return item;
-  });
   const { dark, toggle } = useDarkMode();
+
+  // URL에서 세션 ID 추출, 없으면 localStorage fallback
+  const sessionMatch = location.pathname.match(/^\/(?:debate|report)\/([^/?#]+)/);
+  const sessionId =
+    sessionMatch?.[1] ||
+    new URLSearchParams(location.search).get("sessionId") ||
+    localStorage.getItem("outthink-active-session");
+  const isDebatePage = location.pathname.startsWith("/debate");
+  const isReportPage = location.pathname.startsWith("/report");
+
+  function resolveHref(href) {
+    if (!sessionId) return href;
+    if (href === "/debate") return `/debate/${sessionId}`;
+    if (href === "/report") return `/report/${sessionId}`;
+    return href;
+  }
+
+  // 토론 중에는 사고증명으로, 사고증명 중에는 토론으로 직접 이동 불가
+  function isBlocked(href) {
+    return (isDebatePage && href === "/report") || (isReportPage && href === "/debate");
+  }
 
   return (
     <>
@@ -90,23 +103,49 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {/* 네비게이션 */}
         <nav className="flex-1 flex flex-col p-3 gap-0.5">
-          {navItems.map((item) => {
+          {NAV_ITEMS.map((item) => {
+            const href = resolveHref(item.href);
+            const blocked = isBlocked(item.href);
             const isActive =
               location.pathname === item.href ||
               (item.href !== "/" && location.pathname.startsWith(item.href));
+
+            const className = `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[14px] transition-colors ${
+              blocked
+                ? "opacity-30 cursor-not-allowed text-gray-600 dark:text-gray-400"
+                : isActive
+                ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-medium"
+                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900"
+            }`;
+
+            const content = (
+              <>
+                {item.icon}
+                {item.label}
+              </>
+            );
+
+            if (blocked) {
+              return (
+                <div
+                  key={item.href}
+                  className={className}
+                  aria-disabled="true"
+                  title="현재 단계에서는 이동할 수 없습니다."
+                >
+                  {content}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
-                to={item.href}
+                to={href}
                 onClick={onClose}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[14px] transition-colors
-                  ${isActive
-                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-medium"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900"
-                  }`}
+                className={className}
               >
-                {item.icon}
-                {item.label}
+                {content}
               </Link>
             );
           })}

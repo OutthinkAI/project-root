@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 
 # -----------------------------------------------------------------------------
-# 1. DB 접속 URL
+# 1. DB 접속
 #    - Docker Compose 환경: 서비스명 'db' 를 호스트로 사용
 #    - 로컬 직접 실행 시 DATABASE_URL 환경변수로 오버라이드 가능
 # -----------------------------------------------------------------------------
